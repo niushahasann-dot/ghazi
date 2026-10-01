@@ -21,14 +21,15 @@ import {
   Globe,
   Loader2,
   Calendar,
-  Award
+  Award,
+  Settings,
+  Flame,
 } from 'lucide-react';
 import { CaseDossier } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
 import { useFullscreen } from '../utils/useFullscreen.ts';
-import { Maximize, Minimize } from 'lucide-react';
-import { PWAInstallButton } from './PWAInstallButton.tsx';
 import { REAL_WORLD_CASES } from '../data/realCases.ts';
+import { SettingsTab } from './SettingsModal.tsx';
 
 interface MainMenuProps {
   onStartConsultation: () => void;
@@ -37,8 +38,7 @@ interface MainMenuProps {
   isSoundOn: boolean;
   setIsSoundOn: (val: boolean) => void;
   onGavelStrike: () => void;
-  onOpenDiagnostics: () => void;
-  onOpenModelTester?: () => void;
+  onOpenSettings: (tab?: SettingsTab) => void;
   activeModel?: string;
 }
 
@@ -49,8 +49,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   isSoundOn,
   setIsSoundOn,
   onGavelStrike,
-  onOpenDiagnostics,
-  onOpenModelTester,
+  onOpenSettings,
   activeModel,
 }) => {
   const [showRealCasesModal, setShowRealCasesModal] = useState(false);
@@ -58,6 +57,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   const [customRealTopic, setCustomRealTopic] = useState('');
   const [isGeneratingRealCase, setIsGeneratingRealCase] = useState(false);
   const [realCasesList, setRealCasesList] = useState<CaseDossier[]>(REAL_WORLD_CASES);
+  const [isDarkAmbienceActive, setIsDarkAmbienceActive] = useState<boolean>(soundManager.isAmbiencePlaying());
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   const toggleSound = () => {
@@ -143,50 +143,25 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          {/* Prominent PWA Install Button */}
-          <PWAInstallButton />
-
-          {/* Active Model Indicator Button */}
-          {onOpenModelTester && (
-            <button
-              onClick={() => {
-                soundManager.playPaperRustle();
-                onOpenModelTester();
-              }}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-950/20 hover:bg-amber-950/40 border border-amber-800/60 text-amber-300 hover:text-amber-200 text-[10px] sm:text-xs font-mono transition-all cursor-pointer shadow min-h-[36px]"
-              title="بررسی و تست اتصال مدل‌های مختلف جمینای (ضد ۵۰۳)"
-            >
-              <Terminal className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-              <span>وضعیت جمینای</span>
-            </button>
-          )}
-
-          {/* Fullscreen Button */}
-          <button
-            onClick={handleFullscreenToggle}
-            className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 min-h-[36px] ${
-              isFullscreen
-                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow'
-                : 'bg-stone-900/90 hover:bg-stone-850 border border-stone-800 text-stone-300 hover:text-amber-200'
-            }`}
-            title={isFullscreen ? 'خروج از تمام صفحه' : 'نمایش تمام صفحه در گوشی و مانیتور (Fullscreen)'}
-          >
-            {isFullscreen ? <Minimize className="w-3.5 h-3.5 text-amber-400" /> : <Maximize className="w-3.5 h-3.5 text-amber-400" />}
-            <span className="hidden sm:inline text-[11px]">{isFullscreen ? 'پنجره' : 'تمام صفحه'}</span>
-          </button>
-
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Background Music Quick Toggle */}
           <button
             onClick={() => {
               soundManager.playPaperRustle();
-              onOpenDiagnostics();
+              if (soundManager.isBgMusicPlaying()) {
+                soundManager.pauseBgMusic();
+              } else {
+                soundManager.playBgMusic();
+              }
             }}
-            className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-850 border border-stone-800 text-stone-400 hover:text-stone-200 text-xs font-bold transition-all cursor-pointer shadow min-h-[36px]"
-            title="کنسول دیباگ و لاگ‌های زنده سیستمی"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-amber-900/40 bg-stone-900/90 hover:bg-stone-850 text-stone-300 hover:text-amber-300 text-xs font-semibold transition-all cursor-pointer shadow min-h-[36px]"
+            title="پخش یا توقف لیست موسیقی پیش‌زمینه دارک"
           >
-            <span className="hidden sm:inline">لاگ‌ها</span>
+            <Volume2 className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span className="hidden sm:inline">موسیقی پیش‌زمینه</span>
           </button>
 
+          {/* Gavel Test Strike */}
           <button
             onClick={() => {
               soundManager.playGavel();
@@ -199,12 +174,26 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             <span className="hidden md:inline">ضربه چکش</span>
           </button>
 
+          {/* Sound FX Toggle */}
           <button
             onClick={toggleSound}
             className="p-2 rounded-xl bg-stone-900/90 hover:bg-stone-850 border border-stone-800 text-stone-400 hover:text-stone-200 transition-colors cursor-pointer shrink-0 min-h-[36px]"
             title={isSoundOn ? 'قطع صدا' : 'وصل صدا'}
           >
             {isSoundOn ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" /> : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-stone-500" />}
+          </button>
+
+          {/* Consolidated Settings Modal Trigger */}
+          <button
+            onClick={() => {
+              soundManager.playPaperRustle();
+              onOpenSettings();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#1c1f30] to-[#151726] hover:from-[#24283f] hover:to-[#1a1d2f] border border-amber-900/50 hover:border-amber-500/50 text-stone-200 hover:text-amber-200 text-xs font-bold transition-all cursor-pointer shadow-md min-h-[36px]"
+            title="تنظیمات جامع دیوان عدالت (نصب PWA، تمام‌صفحه، وضعیت هوش مصنوعی جمینای، لاگ‌های سیستمی و صدا)"
+          >
+            <Settings className="w-4 h-4 text-amber-400" />
+            <span>تنظیمات</span>
           </button>
         </div>
       </header>

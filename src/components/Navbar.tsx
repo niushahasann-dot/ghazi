@@ -1,8 +1,6 @@
 import React from 'react';
-import { Gavel, Volume2, VolumeX, FolderOpen, Scale, FileSignature, Sparkles, Home, LogOut, Maximize, Minimize, Cpu, Zap } from 'lucide-react';
+import { Gavel, Volume2, VolumeX, FolderOpen, Scale, FileSignature, Home, Settings } from 'lucide-react';
 import { soundManager } from '../utils/audio.ts';
-import { useFullscreen } from '../utils/useFullscreen.ts';
-import { PWAInstallButton } from './PWAInstallButton.tsx';
 
 interface NavbarProps {
   currentTab: 'dossier' | 'court' | 'verdict';
@@ -14,8 +12,7 @@ interface NavbarProps {
   onGavelClick: () => void;
   gavelAnimating: boolean;
   onReturnToMenu: () => void;
-  activeModel?: string;
-  onOpenModelTester?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,29 +25,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   onGavelClick,
   gavelAnimating,
   onReturnToMenu,
-  activeModel,
-  onOpenModelTester,
+  onOpenSettings,
 }) => {
-  const { isFullscreen, toggleFullscreen } = useFullscreen();
-
   const toggleSound = () => {
     const next = !isSoundOn;
     setIsSoundOn(next);
     soundManager.setSoundEnabled(next);
     if (next) soundManager.playPaperRustle();
-  };
-
-  const handleFullscreenClick = () => {
-    soundManager.playPaperRustle();
-    toggleFullscreen();
-  };
-
-  const getModelShortName = (name?: string) => {
-    if (!name) return 'جمینای ۳.۸';
-    if (name.includes('lite')) return 'جمینای ۳.۱ لایت';
-    if (name.includes('3.8')) return 'جمینای ۳.۸ فلش';
-    if (name.includes('latest')) return 'جمینای فلش پایدار';
-    return name;
   };
 
   return (
@@ -72,19 +53,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <div className="h-4 w-px bg-stone-800 hidden sm:block shrink-0" />
 
-          {/* Court Logo Emblem button to toggle Fullscreen */}
-          <button
-            onClick={handleFullscreenClick}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-md shadow-amber-950/60 shrink-0 relative bg-stone-900 hover:scale-110 transition-all cursor-pointer group ring-2 ring-amber-500/20"
-            title={isFullscreen ? 'خروج از حالت تمام صفحه' : 'نمایش تمام صفحه در گوشی و مانیتور (Fullscreen)'}
+          {/* Court Logo Emblem */}
+          <div
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-md shadow-amber-950/60 shrink-0 relative bg-stone-900 ring-2 ring-amber-500/20"
+            title="نشان رسمی دادگاه آقای قاضی"
           >
             <img
               src="/images/court_gavel_logo.jpg"
               alt="نشان رسمی دادگاه آقای قاضی"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover scale-[1.15] group-hover:scale-125 transition-transform duration-300"
+              className="w-full h-full object-cover scale-[1.15]"
             />
-          </button>
+          </div>
 
           <div className="min-w-0">
             <div className="flex items-center gap-1 sm:gap-1.5">
@@ -149,46 +129,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* Actions: Live Model Badge, PWA Install, Fullscreen, Gavel Strike & Sound */}
+        {/* Actions: Gavel Strike, Sound & Consolidated Settings Modal */}
         <div className="flex items-center gap-1 sm:gap-1.5 order-2 lg:order-3">
-          {/* Prominent PWA Install Button */}
-          <PWAInstallButton />
-
-          {/* Active Model Indicator Chip (Clickable to open test modal) */}
-          {onOpenModelTester && (
-            <button
-              onClick={() => {
-                soundManager.playPaperRustle();
-                onOpenModelTester();
-              }}
-              className="flex items-center gap-1 px-2 py-1 rounded-xl bg-[#141624] hover:bg-[#1c1e30] border border-stone-800 text-stone-300 hover:text-amber-300 text-[10px] sm:text-xs font-mono transition-all cursor-pointer shadow-sm shrink-0 min-h-[34px]"
-              title="مشاهده وضعیت نسخه‌های مختلف جمینای و تست اتصال"
-            >
-              <Zap className="w-3 h-3 text-amber-400 animate-pulse" />
-              <span className="hidden md:inline">{getModelShortName(activeModel)}</span>
-              <span className="md:hidden">جمینای</span>
-            </button>
-          )}
-
-          {/* Fullscreen Button */}
-          <button
-            onClick={handleFullscreenClick}
-            className={`p-1.5 sm:p-2 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1 min-h-[34px] ${
-              isFullscreen
-                ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 shadow'
-                : 'bg-stone-900/90 hover:bg-stone-800 border-stone-800 text-stone-300 hover:text-amber-200'
-            }`}
-            title={isFullscreen ? 'خروج از حالت تمام صفحه' : 'نمایش تمام صفحه در گوشی و مانیتور (Fullscreen)'}
-          >
-            {isFullscreen ? <Minimize className="w-3.5 h-3.5 text-amber-400" /> : <Maximize className="w-3.5 h-3.5 text-amber-400" />}
-            <span className="hidden xl:inline text-[11px]">{isFullscreen ? 'پنجره' : 'تمام‌صفحه'}</span>
-          </button>
-
           {/* Gavel Strike Action */}
           <button
             onClick={onGavelClick}
             title="کوبیدن چکش نظم دادگاه (سکوت در صحن!)"
-            className={`relative flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-amber-100 text-[11px] sm:text-xs font-semibold shadow-lg border border-amber-500/30 transition-all cursor-pointer active:scale-95 min-h-[34px] ${
+            className={`relative flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-700 to-amber-900 hover:from-amber-600 hover:to-amber-800 text-amber-100 text-[11px] sm:text-xs font-semibold shadow-lg border border-amber-500/30 transition-all cursor-pointer active:scale-95 min-h-[34px] ${
               gavelAnimating ? 'ring-4 ring-amber-500/50 scale-105' : ''
             }`}
           >
@@ -204,6 +151,21 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             {isSoundOn ? <Volume2 className="w-3.5 h-3.5 text-amber-400" /> : <VolumeX className="w-3.5 h-3.5 text-stone-500" />}
           </button>
+
+          {/* Consolidated Settings Button */}
+          {onOpenSettings && (
+            <button
+              onClick={() => {
+                soundManager.playPaperRustle();
+                onOpenSettings();
+              }}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-amber-300 text-xs font-semibold transition cursor-pointer shadow-sm min-h-[34px]"
+              title="تنظیمات (نصب PWA، تمام‌صفحه، وضعیت جمینای، لاگ‌های فنی و صدا)"
+            >
+              <Settings className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden md:inline">تنظیمات</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

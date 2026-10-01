@@ -8,16 +8,24 @@ import { CourtroomView } from './components/CourtroomView.tsx';
 import { VerdictModal } from './components/VerdictModal.tsx';
 import { ConsultationRoom } from './components/ConsultationRoom.tsx';
 import { MainMenu } from './components/MainMenu.tsx';
-import { DiagnosticsPanel } from './components/DiagnosticsPanel.tsx';
-import { GeminiModelTesterModal } from './components/GeminiModelTesterModal.tsx';
-import { PWAInstallButton } from './components/PWAInstallButton.tsx';
+import { SettingsModal, SettingsTab } from './components/SettingsModal.tsx';
 import { OfflineIndicator } from './components/OfflineIndicator.tsx';
-import { Home, ArrowRight, Sparkles, Terminal, Activity } from 'lucide-react';
+import { Home, Sparkles, Settings } from 'lucide-react';
 
 export default function App() {
-  // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session) | 'diagnostics' (system logs terminal)
-  const [currentView, setCurrentView] = useState<'menu' | 'consult' | 'game' | 'diagnostics'>('menu');
+  // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session)
+  const [currentView, setCurrentView] = useState<'menu' | 'consult' | 'game'>('menu');
   const [currentTab, setCurrentTab] = useState<'dossier' | 'court' | 'verdict'>('court');
+
+  // Consolidated Settings Modal state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('pwa');
+
+  const handleOpenSettings = (tab?: SettingsTab) => {
+    soundManager.playPaperRustle();
+    if (tab) setSettingsTab(tab);
+    setIsSettingsOpen(true);
+  };
 
   // Case loaded
   const [caseData, setCaseData] = useState<CaseDossier | null>(null);
@@ -31,7 +39,6 @@ export default function App() {
   
   const [selectedEvidenceToConfront, setSelectedEvidenceToConfront] = useState<EvidenceItem | null>(null);
   const [isVerdictModalOpen, setIsVerdictModalOpen] = useState(false);
-  const [isModelTesterOpen, setIsModelTesterOpen] = useState(false);
   const [lastActiveModel, setLastActiveModel] = useState<string>('gemini-3.8-flash');
   const [lastModelLatency, setLastModelLatency] = useState<number | undefined>(undefined);
 
@@ -43,6 +50,23 @@ export default function App() {
   const [isDisputeActive, setIsDisputeActive] = useState(false);
   const [isDisputeLoading, setIsDisputeLoading] = useState(false);
   const [disputeTimeoutIds, setDisputeTimeoutIds] = useState<number[]>([]);
+
+  // Continuous Background Playlist (Plays across ALL screens of the game sequentially and loops)
+  useEffect(() => {
+    soundManager.playBgMusic();
+
+    const handleFirstUserInteraction = () => {
+      soundManager.playBgMusic();
+    };
+
+    window.addEventListener('pointerdown', handleFirstUserInteraction, { once: true });
+    window.addEventListener('keydown', handleFirstUserInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstUserInteraction);
+      window.removeEventListener('keydown', handleFirstUserInteraction);
+    };
+  }, []);
 
   // Initialize presets on mount from server if available
   useEffect(() => {
@@ -396,14 +420,7 @@ export default function App() {
           isSoundOn={isSoundOn}
           setIsSoundOn={setIsSoundOn}
           onGavelStrike={handleGavelClick}
-          onOpenDiagnostics={() => {
-            soundManager.playPaperRustle();
-            setCurrentView('diagnostics');
-          }}
-          onOpenModelTester={() => {
-            soundManager.playPaperRustle();
-            setIsModelTesterOpen(true);
-          }}
+          onOpenSettings={handleOpenSettings}
           activeModel={lastActiveModel}
         />
       )}
@@ -433,10 +450,14 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <PWAInstallButton />
-              <div className="text-[11px] text-stone-400 hidden lg:block">
-                پس از توافق نهایی با جمینای، مستقیماً وارد صحن دادگاه خواهید شد.
-              </div>
+              <button
+                onClick={() => handleOpenSettings()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-amber-300 text-xs font-semibold transition cursor-pointer"
+                title="تنظیمات جامع دیوان عدالت"
+              >
+                <Settings className="w-4 h-4 text-amber-400" />
+                <span>تنظیمات</span>
+              </button>
             </div>
           </header>
 
@@ -467,11 +488,7 @@ export default function App() {
               soundManager.playPaperRustle();
               setCurrentView('menu');
             }}
-            activeModel={lastActiveModel}
-            onOpenModelTester={() => {
-              soundManager.playPaperRustle();
-              setIsModelTesterOpen(true);
-            }}
+            onOpenSettings={handleOpenSettings}
           />
 
           {/* Main Courtroom or Dossier Area */}
@@ -538,52 +555,17 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. Real-time System Logs & Diagnostics View */}
-      {currentView === 'diagnostics' && (
-        <div className="min-h-screen flex flex-col bg-[#08090e]">
-          <header className="sticky top-0 z-40 bg-[#0f111c]/95 backdrop-blur-md border-b border-amber-900/40 px-4 py-3 flex items-center justify-between shadow-xl">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  soundManager.playPaperRustle();
-                  setCurrentView('menu');
-                }}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-amber-300 text-xs font-semibold transition-all cursor-pointer shadow-sm group"
-              >
-                <Home className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
-                <span>بازگشت به منوی اصلی</span>
-              </button>
-
-              <div className="h-5 w-px bg-stone-800" />
-
-              <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-amber-100">
-                <Terminal className="w-4 h-4 text-amber-500 animate-pulse" />
-                <span>مرکز عیب‌یابی و مانیتورینگ زنده جمینای</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <PWAInstallButton />
-              <div className="text-[11px] text-stone-500 hidden lg:block">
-                کنترل یکپارچه پایداری شبکه و تحلیل پاسخ مدل‌های فلش ۳.۵ الی ۳.۸
-              </div>
-            </div>
-          </header>
-
-          <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
-            <DiagnosticsPanel />
-          </main>
-        </div>
-      )}
-
-      {/* 5. Live Gemini Model Tester & Connection Status Modal */}
-      <GeminiModelTesterModal
-        isOpen={isModelTesterOpen}
-        onClose={() => setIsModelTesterOpen(false)}
-        lastActiveModel={lastActiveModel}
-        lastModelLatency={lastModelLatency}
+      {/* Consolidated Judicial Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        defaultTab={settingsTab}
+        isSoundOn={isSoundOn}
+        setIsSoundOn={setIsSoundOn}
+        activeModel={lastActiveModel}
       />
 
-      {/* 6. PWA Offline Connectivity Indicator */}
+      {/* PWA Offline Connectivity Indicator */}
       <OfflineIndicator />
     </div>
   );
