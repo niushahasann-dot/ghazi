@@ -9,10 +9,13 @@ import {
   FileSignature,
   ArrowRight,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  FileCheck2,
+  Printer
 } from 'lucide-react';
 import { CaseDossier, Character, VerdictResult } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
+import { OfficialJudicialSheet } from './OfficialJudicialSheet.tsx';
 
 interface VerdictModalProps {
   caseData: CaseDossier;
@@ -42,6 +45,7 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
   const [reasoning, setReasoning] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<VerdictResult | null>(null);
+  const [showVerdictSheet, setShowVerdictSheet] = useState(false);
 
   if (!isOpen) return null;
 
@@ -296,13 +300,27 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
 
               {/* Footer Actions */}
               <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setResult(null)}
-                  className="px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-300 text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  ویرایش و انشای مجدد رأی
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playPaperRustle();
+                      setShowVerdictSheet(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all cursor-pointer shadow"
+                  >
+                    <Printer className="w-4 h-4 text-amber-400" />
+                    <span>مشاهده و چاپ دادنامه رسمی (با مهر دادگاه)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setResult(null)}
+                    className="px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    ویرایش و انشای مجدد رأی
+                  </button>
+                </div>
 
                 <button
                   type="button"
@@ -316,6 +334,19 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                   <span>بررسی پرونده جنایی بعدی</span>
                 </button>
               </div>
+
+              {/* Official Verdict Document Sheet Modal */}
+              <OfficialJudicialSheet
+                caseData={caseData}
+                type="verdict"
+                verdictResult={result}
+                accusedName={selectedChar?.name}
+                verdictType={verdictType}
+                penalty={penalty}
+                reasoning={reasoning}
+                isOpen={showVerdictSheet}
+                onClose={() => setShowVerdictSheet(false)}
+              />
             </div>
           )}
         </div>

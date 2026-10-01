@@ -11,11 +11,13 @@ import {
   ShieldCheck,
   Search,
   Sparkles,
-  ChevronLeft
+  ChevronLeft,
+  FileCheck2
 } from 'lucide-react';
 import { CaseDossier, EvidenceItem, Character } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
 import { EvidenceInspectModal } from './EvidenceInspectModal.tsx';
+import { OfficialJudicialSheet } from './OfficialJudicialSheet.tsx';
 
 interface CaseDossierViewProps {
   caseData: CaseDossier;
@@ -31,6 +33,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
   onPresentEvidenceInCourt,
 }) => {
   const [inspectedEvidence, setInspectedEvidence] = useState<EvidenceItem | null>(null);
+  const [showIndictmentSheet, setShowIndictmentSheet] = useState(false);
 
   const getRoleBadge = (role: Character['role']) => {
     switch (role) {
@@ -94,9 +97,22 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
 
         {/* Action quick buttons */}
         <div className="mt-6 pt-5 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-stone-400">
-            راهنمای قاضی: کلیه مدارک و گزارش کالبدشکافی را با دقت بررسی کرده و سپس اشخاص را برای بازجویی احضار کنید.
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                soundManager.playPaperRustle();
+                setShowIndictmentSheet(true);
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 text-amber-200 text-xs font-bold border border-amber-600/40 transition-colors cursor-pointer shadow"
+            >
+              <FileCheck2 className="w-4 h-4 text-amber-400" />
+              <span>مشاهده کیفرخواست رسمی دادسرا (مهر شده)</span>
+            </button>
+            <p className="text-xs text-stone-400 hidden lg:block">
+              کلیه مدارک و گزارش کالبدشکافی را بررسی و سپس اشخاص را برای بازجویی احضار کنید.
+            </p>
+          </div>
+
           <button
             onClick={() => {
               soundManager.playGavel();
@@ -297,6 +313,14 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
           onPresentInCourt={onPresentEvidenceInCourt}
         />
       )}
+
+      {/* Official Indictment Sheet Modal */}
+      <OfficialJudicialSheet
+        caseData={caseData}
+        type="indictment"
+        isOpen={showIndictmentSheet}
+        onClose={() => setShowIndictmentSheet(false)}
+      />
     </div>
   );
 };

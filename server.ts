@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import fs from 'fs';
@@ -13,8 +13,17 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Model selection (Defaults to gemini-3.5-flash as requested, configurable via GEMINI_MODEL)
+const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+
+// Helper to strip Markdown codeblocks before JSON parsing
+function parseJsonFromAi<T>(rawText: string): T {
+  let cleaned = (rawText || '').trim();
+  cleaned = cleaned.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
+  return JSON.parse(cleaned) as T;
+}
+
 // 1. Initialize Gemini AI Client (Railway Proxy / Bridge Setup)
-// Supports GEMINI_API_KEY, GOOGLE_API_KEY, and optional custom reverse proxy endpoint (GEMINI_BASE_URL)
 const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || '';
 const customBaseUrl = process.env.GEMINI_BASE_URL || process.env.GOOGLE_GENAI_BASE_URL || '';
 
@@ -30,7 +39,7 @@ if (apiKey) {
         },
       },
     });
-    console.log('[پل جمینای] ارتباط با سرویس هوش مصنوعی جمینای فعال گردید.');
+    console.log(`[پل جمینای] ارتباط با سرویس هوش مصنوعی جمینای (${MODEL_NAME}) فعال گردید.`);
   } catch (err) {
     console.error('[پل جمینای] خطا در راه‌اندازی کلاینت هوش مصنوعی:', err);
   }
@@ -48,7 +57,7 @@ async function startServer() {
   // STATIC ASSETS & IMAGE DELIVERY (Railway Fix)
   // Ensures images are served with proper headers without text/html 404 fallback
   // ==========================================
-  const serveImageHandler = (req: Request, res: Response, next: express.NextFunction) => {
+  const serveImageHandler = (req: Request, res: Response, next: NextFunction) => {
     const ext = path.extname(req.path).toLowerCase();
     if (!['.jpg', '.jpeg', '.png', '.webp', '.svg', '.ico'].includes(ext)) {
       return next();
@@ -89,10 +98,10 @@ async function startServer() {
     res.json({
       active: !!ai,
       bridge: 'Railway Europe/Global Gateway',
-      model: 'gemini-3.8-flash',
+      model: MODEL_NAME,
       noVpnNeeded: true,
       message: ai
-        ? 'پل ارتباطی جمینای در سرور فعال و آماده است.'
+        ? `پل ارتباطی جمینای (${MODEL_NAME}) در سرور فعال و آماده است.`
         : 'سرور در حالت شبیه‌ساز آفلاین است. متغیر GEMINI_API_KEY را در پنل ریلوی وارد کنید.',
     });
   });
@@ -107,7 +116,6 @@ async function startServer() {
     const { messages, userPrompt } = req.body;
 
     if (!ai) {
-      // High-quality offline fallback simulation
       const msgCount = (messages || []).length;
       const isReady =
         msgCount >= 2 ||
@@ -136,7 +144,7 @@ async function startServer() {
       const prompt = `${systemPrompt}\n\nتاریخچه گفتگوی قبلی قاضی و مشاور:\n${historyContext}\n\nپیام جدید قاضی: ${userPrompt}\n\nپاسخ مشاور جنایی:`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: MODEL_NAME,
         contents: prompt,
       });
 
@@ -185,7 +193,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
 =============================================
 
 بر اساس این گفتگو و توافق حاصل‌شده، پرونده جنایی نهایی را به صورت یک ساختار JSON کامل و معتبر ایجاد کنید.
-پرونده باید حتماً منطبق با موضوع، اسامی، محل و شواهد مورد توافق در متن بالا باشد!
+پرونده باید دقیقاً منطبق با موضوع (مثلاً اگر قتل بازیکن فوتبال است، حتماً مقتول و متهمان مربوط به ورزشگاه و تیم فوتبال باشند)، اسامی، محل و شواهد مورد توافق در متن بالا باشد!
 
 الزامات دقیق:
 ۱. فضای پرونده دارک، جنایی، جدی و معمایی باشد.
@@ -202,7 +210,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
 {
   "id": "case-${Date.now()}",
   "caseNumber": "۱۴۰۵/...-ج",
-  "title": "عنوان پرونده جنایی طبق توافق",
+  "title": "عنوان پرونده جنایی طبق توافق (مثلاً: قتل مرموز ستاره فوتبال در رختکن)",
   "genre": "ژانر و موضوع جرم",
   "incidentDate": "تاریخ و ساعت وقوع",
   "location": "مکان دقیق وقوع جنایت طبق توافق",
@@ -254,7 +262,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: MODEL_NAME,
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -262,8 +270,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
         },
       });
 
-      const responseText = response.text || '';
-      const parsedCase = JSON.parse(responseText) as CaseDossier;
+      const parsedCase = parseJsonFromAi<CaseDossier>(response.text || '{}');
       res.json(parsedCase);
     } catch (error) {
       console.error('Error generating case:', error);
@@ -290,7 +297,6 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
       : null;
 
     if (!ai) {
-      // High fidelity offline reply
       const isDef = char.role === 'defendant';
       return res.json({
         speech: isDef
@@ -307,10 +313,6 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
         .map((h: { sender: string; text: string }) => `${h.sender}: ${h.text}`)
         .join('\n');
 
-      const isDefendant = char.role === 'defendant';
-      const isWitness = char.role === 'witness';
-      const isExpert = char.role === 'expert';
-
       const prompt = `شما در حال نقش‌آفرینی زنده در صحن دادگاه جنایی بازی «آقای قاضی» هستید.
 نام شخصیتی که باید نقشش را بازی کنید: ${char.name}
 نقش در دادگاه: ${char.roleTitle} (${char.role})
@@ -323,8 +325,8 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
 خلاصه پرونده:
 ${caseData.briefing}
 حقیقت پنهان واقعی پشت پرده:
-${caseData.hiddenTruth.howCrimeHappened}
-تناقض کلیدی پرونده: ${caseData.hiddenTruth.keyContradiction}
+${caseData.hiddenTruth?.howCrimeHappened || ''}
+تناقض کلیدی پرونده: ${caseData.hiddenTruth?.keyContradiction || ''}
 
 سابقه سوال و جواب‌های قبلی در دادگاه:
 ${historyStr}
@@ -343,12 +345,12 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
   "speech": "پاسخ مستقیم و دیالوگ کاراکتر در صحن دادگاه به زبان فارسی",
   "innerThought": "فکر مخفیانه یا استرس درون ذهن کاراکتر (اختیاری)",
   "slipUp": "اگر متهم دچار تناقض یا سوتی کلامی شد شرح کوتاه آن، در غیر این صورت null",
-  "stressDelta": 10, // تغییر میزان استرس متهم بین -10 تا +25
+  "stressDelta": 10,
   "lawyerIntervention": "اگر وکیل مدافع کاراکتر اعتراض قانونی دارد متن اعتراض او، در غیر این صورت null"
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: MODEL_NAME,
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -356,7 +358,7 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
         },
       });
 
-      const parsed = JSON.parse(response.text || '{}');
+      const parsed = parseJsonFromAi<Record<string, unknown>>(response.text || '{}');
       res.json(parsed);
     } catch (error) {
       console.error('Error in interrogate API:', error);
@@ -395,10 +397,10 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
 پرونده: ${caseData.title}
 شرح واقعه: ${caseData.briefing}
 حقیقت پنهان واقعی:
-مجرم اصلی: ${caseData.hiddenTruth.realCulpritName} (آیدی: ${realCulpritId})
-انگیزه واقعی: ${caseData.hiddenTruth.motive}
-نحوه وقوع: ${caseData.hiddenTruth.howCrimeHappened}
-تناقض کلیدی: ${caseData.hiddenTruth.keyContradiction}
+مجرم اصلی: ${caseData.hiddenTruth?.realCulpritName || 'مشخص شده در پرونده'} (آیدی: ${realCulpritId})
+انگیزه واقعی: ${caseData.hiddenTruth?.motive || ''}
+نحوه وقوع: ${caseData.hiddenTruth?.howCrimeHappened || ''}
+تناقض کلیدی: ${caseData.hiddenTruth?.keyContradiction || ''}
 
 حکم صادره توسط قاضی (بازیکن):
 شخص انتخاب شده: ${chosenPerson?.name || 'نامشخص'} (آیدی: ${accusedId})
@@ -423,7 +425,7 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: MODEL_NAME,
         contents: evaluationPrompt,
         config: {
           responseMimeType: 'application/json',
@@ -431,7 +433,7 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
         },
       });
 
-      const parsed = JSON.parse(response.text || '{}');
+      const parsed = parseJsonFromAi<Record<string, unknown>>(response.text || '{}');
       res.json(parsed);
     } catch (error) {
       console.error('Error evaluating verdict:', error);
@@ -472,7 +474,7 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[آقای قاضی] پل هوشمند دادگاه و سرور روی پورت ${PORT} آماده پاسخگویی است.`);
+    console.log(`[آقای قاضی] پل هوشمند دادگاه روی پورت ${PORT} با مدل ${MODEL_NAME} فعال شد.`);
   });
 }
 
