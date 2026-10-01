@@ -472,8 +472,6 @@ export default function App() {
                 onOpenDossier={() => setCurrentTab('dossier')}
                 onOpenVerdict={() => setIsVerdictModalOpen(true)}
                 isDisputeActive={isDisputeActive}
-                isDisputeLoading={isDisputeLoading}
-                onTriggerDispute={triggerHeatedDispute}
               />
             )}
 

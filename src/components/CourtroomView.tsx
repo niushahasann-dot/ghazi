@@ -36,8 +36,6 @@ interface CourtroomViewProps {
   onOpenDossier?: () => void;
   onOpenVerdict?: () => void;
   isDisputeActive: boolean;
-  isDisputeLoading: boolean;
-  onTriggerDispute: () => Promise<void>;
 }
 
 export const CourtroomView: React.FC<CourtroomViewProps> = ({
@@ -54,8 +52,6 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
   onOpenDossier,
   onOpenVerdict,
   isDisputeActive,
-  isDisputeLoading,
-  onTriggerDispute,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showEvidenceSelector, setShowEvidenceSelector] = useState(false);
@@ -400,7 +396,7 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
 
             {/* Trial Action Board & Input Form */}
             <div className="p-4 bg-[#141624] border-t border-stone-800 space-y-3 shrink-0">
-              {/* Quick Questions & Heated Dispute manual triggers */}
+              {/* Quick Questions */}
               <div className="flex flex-wrap items-center gap-2">
                 {quickQuestions.map((q, idx) => (
                   <button
@@ -415,17 +411,6 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                     {q}
                   </button>
                 ))}
-
-                {/* Heated Dispute Manual Trigger Button */}
-                <button
-                  onClick={onTriggerDispute}
-                  disabled={isDisputeActive || isDisputeLoading}
-                  className="text-[11px] px-3.5 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/50 text-red-300 hover:text-red-200 border border-red-650/40 transition-colors cursor-pointer flex items-center gap-1 shadow disabled:opacity-40"
-                  title="مرافعه لفظی شدید بین متهمان ایجاد کنید"
-                >
-                  <Flame className="w-3.5 h-3.5 text-red-400 animate-pulse shrink-0" />
-                  <span>{isDisputeLoading ? 'درحال ایجاد مرافعه...' : '🔥 جرقه درگیری لفظی متهمان'}</span>
-                </button>
               </div>
 
               {/* Chat Form */}
