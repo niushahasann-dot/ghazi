@@ -184,12 +184,11 @@ export default function App() {
     setCurrentTab('court');
   };
 
-  // Interrogate summoned person
+  // Interrogate in general group chat with dynamic Gemini routing and fuzzy match typos
   const handleSendMessage = async (text: string, evidenceId?: string) => {
     if (isInterrogating || !caseData) return;
     setIsInterrogating(true);
 
-    const activeChar = caseData.characters.find((c) => c.id === activeCharacterId) || caseData.characters[0];
     const presentedEvidence = evidenceId
       ? caseData.evidence.find((e) => e.id === evidenceId)
       : undefined;
@@ -212,7 +211,6 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           caseData,
-          characterId: activeChar.id,
           question: text,
           evidencePresentedId: evidenceId,
           history: courtroomMessages.map((m) => ({
@@ -223,6 +221,13 @@ export default function App() {
       });
 
       const data = await response.json();
+
+      // Find which character actually responded based on Gemini dynamic routing
+      const responderId = data.addressedCharacterId || activeCharacterId || caseData.characters[0].id;
+      const responderChar = caseData.characters.find((c) => c.id === responderId) || caseData.characters[0];
+
+      // Update active focused character to the one responding so their face, stress level, and card are highlighted
+      setActiveCharacterId(responderId);
 
       // Check lawyer intervention
       if (data.lawyerIntervention) {
@@ -238,15 +243,15 @@ export default function App() {
         setCourtroomMessages((prev) => [...prev, lawyerMsg]);
       }
 
-      // Update stress
+      // Update stress for the responding character
       if (data.stressDelta) {
         setCharacterStressMap((prev) => {
-          const oldVal = prev[activeChar.id] ?? activeChar.suspicionLevel;
+          const oldVal = prev[responderId] ?? responderChar.suspicionLevel;
           const newVal = Math.min(100, Math.max(0, oldVal + data.stressDelta));
           if (newVal > 75) {
             soundManager.playHeartbeat();
           }
-          return { ...prev, [activeChar.id]: newVal };
+          return { ...prev, [responderId]: newVal };
         });
       }
 
@@ -258,8 +263,8 @@ export default function App() {
       const characterReplyMsg: InterrogationMessage = {
         id: `msg-c-${Date.now()}`,
         sender: 'character',
-        senderName: activeChar.name,
-        characterId: activeChar.id,
+        senderName: responderChar.name,
+        characterId: responderChar.id,
         text: data.speech || 'جناب قاضی، پاسخ دیگری برای این ادعا ندارم.',
         innerThought: data.innerThought,
         slipUp: data.slipUp,
@@ -288,8 +293,8 @@ export default function App() {
             const disputeMsg2: InterrogationMessage = {
               id: `dispute-auto-${Date.now()}-2`,
               sender: 'character',
-              senderName: activeChar.name,
-              characterId: activeChar.id,
+              senderName: responderChar.name,
+              characterId: responderChar.id,
               text: data.interruption.replyText,
               timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
             };
@@ -302,9 +307,9 @@ export default function App() {
             const timeouts: number[] = [];
             const genericAngryLines = [
               { senderName: data.interruption.interrupterName, text: 'جناب قاضی، این آقا دارد کاملاً دروغ می‌گوید تا خودش را تبرئه کند!' },
-              { senderName: activeChar.name, text: 'خفه شو! تو خودت آن شب در عمارت بودی و کلید کتابخانه دست تو بود!' },
+              { senderName: responderChar.name, text: 'خفه شو! تو خودت آن شب در عمارت بودی و کلید کتابخانه دست تو بود!' },
               { senderName: data.interruption.interrupterName, text: 'تهمت نزن شیاد! سوابق بانکی و الایبی جعلی تو همه چیز را آشکار خواهد کرد!' },
-              { senderName: activeChar.name, text: 'سر جایت بنشین و بگذار حقیقت مشخص شود!' }
+              { senderName: responderChar.name, text: 'سر جایت بنشین و بگذار حقیقت مشخص شود!' }
             ];
             genericAngryLines.forEach((line, index) => {
               const tid = window.setTimeout(() => {

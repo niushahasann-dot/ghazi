@@ -191,10 +191,10 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
           <div className="flex items-center justify-between mb-2.5 text-xs">
             <span className="font-bold text-amber-300 flex items-center gap-1.5">
               <UserCheck className="w-4 h-4 text-amber-400" />
-              فراخوانی اشخاص به تریبون بازجویی دادگاه (جهت طرح سوال اختصاصی کلیک کنید):
+              👥 سالن عمومی دادگاه (برای مخاطب قرار دادن سریع، روی نام شخص کلیک کنید):
             </span>
             <span className="text-stone-400 text-[11px]">
-              حاضر در تریبون: <strong className="text-amber-200">{activeChar.name}</strong>
+              تمرکز فعلی روی: <strong className="text-amber-200">{activeChar.name}</strong>
             </span>
           </div>
 
@@ -208,10 +208,10 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                   key={char.id}
                   disabled={isDisputeActive}
                   onClick={() => {
-                    if (char.id !== activeChar.id) {
-                      soundManager.playGavel();
-                      onSelectCharacter(char.id);
-                    }
+                    soundManager.playGavel();
+                    onSelectCharacter(char.id);
+                    // Pre-fill the input box with their name to easily address them!
+                    setInputText(`${char.name}، `);
                   }}
                   className={`p-3 rounded-xl border text-right transition-all cursor-pointer relative overflow-hidden ${
                     isDisputeActive ? 'opacity-40 cursor-not-allowed' : ''
@@ -439,7 +439,7 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                   placeholder={
                     isDisputeActive
                       ? '⚠️ درگیری لفظی فعال است! چکش قاضی را بکوبید تا متهمان را ساکت کنید.'
-                      : 'سوال حقوقی خود را از شخص حاضر در تریبون بپرسید یا مدرکی پیوست کنید...'
+                      : 'قاضی گرامی، اسم شخص را بنویسید (مثلاً "کامران") یا کلیک کنید تا مستقیماً به او سوال بفرستید...'
                   }
                   className="flex-1 px-4 py-2.5 rounded-xl bg-stone-950 text-stone-200 text-xs md:text-sm border border-stone-800/80 focus:border-amber-500 focus:outline-none transition-colors disabled:opacity-60"
                 />
