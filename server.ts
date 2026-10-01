@@ -13,26 +13,10 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Model selection strictly prioritizing modern Gemini flash models (3.8, 3.7, 3.6, 3.5, 3.1-flash-lite)
+// Multi-model pools for balanced workload distribution & zero-stall 503 recovery
 const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
-const FALLBACK_MODELS = Array.from(
-  new Set([
-    PRIMARY_MODEL,
-    'gemini-3.8-flash',
-    'gemini-3.7-flash',
-    'gemini-3.6-flash',
-    'gemini-3.5-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-3.1-flash-lite',
-    'gemini-flash-latest',
-    'models/gemini-3.8-flash',
-    'models/gemini-3.7-flash',
-    'models/gemini-3.6-flash',
-    'models/gemini-3.5-flash',
-    'models/gemini-3.5-flash-lite',
-    'models/gemini-3.1-flash-lite',
-  ])
-);
+export const MODEL_TIER_MAIN = [PRIMARY_MODEL, 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+export const MODEL_TIER_FAST_LITE = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 
 // ============================================================================
 // SYSTEM LOGGING FRAMEWORK (For live debugging in the frontend UI)
@@ -106,8 +90,14 @@ if (apiKey) {
   addSystemLog('warn', 'GeminiClient', 'کلید GEMINI_API_KEY در متغیرهای محیطی یافت نشد! حالت آفلاین سناریونویس فعال شد.');
 }
 
-// Helper to generate content with automatic model fallback & 503/429 instant rollover
-async function generateAiContent(prompt: string, isJsonMode = false, temperature = 0.85, maxOutputTokens?: number) {
+// Helper to generate content with task-based model distribution, token compression & instant 503 rollover
+async function generateAiContent(
+  prompt: string,
+  isJsonMode = false,
+  temperature = 0.85,
+  maxOutputTokens?: number,
+  modelPool: string[] = MODEL_TIER_MAIN
+) {
   if (!ai) {
     addSystemLog('error', 'GeminiAPI', 'تلاش برای تولید محتوا در حالی که کلاینت هوش مصنوعی فعال نیست (بدون کلید API)');
     throw new Error('AI client not initialized');
@@ -116,15 +106,18 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
   let lastError: any = null;
   const triedModels = new Set<string>();
 
-  addSystemLog('info', 'GeminiAPI', `شروع فراخوانی تولید محتوا با اولویت مدل‌های فلش (${FALLBACK_MODELS.slice(0, 4).join(', ')})`);
+  addSystemLog('info', 'GeminiAPI', `ارسال درخواست به استخر هوشمند مدل‌ها (${modelPool.join(' ⮞ ')})`);
 
-  for (const modelCandidate of FALLBACK_MODELS) {
+  for (const modelCandidate of modelPool) {
     if (triedModels.has(modelCandidate)) continue;
     triedModels.add(modelCandidate);
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        addSystemLog('info', 'GeminiAPI', `تلاش برای ارسال درخواست به مدل [${modelCandidate}] - تلاش شماره ${attempt}`);
+        const isLite = modelCandidate.includes('lite');
+        const thinkingLevel = isLite ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW;
+
+        addSystemLog('info', 'GeminiAPI', `فراخوانی مدل [${modelCandidate}] (حالت ${isLite ? 'سریع/کم‌مصرف' : 'استاندارد'}) - تلاش ${attempt}`);
         
         const response = await ai.models.generateContent({
           model: modelCandidate,
@@ -133,32 +126,31 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
             ...(isJsonMode ? { responseMimeType: 'application/json' } : {}),
             temperature,
             ...(maxOutputTokens ? { maxOutputTokens } : {}),
-            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+            thinkingConfig: { thinkingLevel },
           },
         });
 
         if (response && response.text) {
-          addSystemLog('success', 'GeminiAPI', `دریافت موفق پاسخ از مدل [${modelCandidate}] در تلاش ${attempt}`, {
+          addSystemLog('success', 'GeminiAPI', `پاسخ موفق از مدل [${modelCandidate}] (تلاش ${attempt})`, {
             characterCount: response.text.length,
-            preview: response.text.substring(0, 150) + '...'
+            preview: response.text.substring(0, 120) + '...'
           });
           return { text: response.text, usedModel: modelCandidate };
         }
       } catch (err: any) {
         const errMsg = err?.message || String(err);
         const status = err?.status || err?.statusCode || 'UnknownStatus';
-        const is503 = status === 503 || errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('high demand');
+        const is503 = status === 503 || errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('high demand') || errMsg.includes('overloaded');
         const is429 = status === 429 || errMsg.includes('429') || errMsg.includes('Quota') || errMsg.includes('RESOURCE_EXHAUSTED');
         
-        addSystemLog('warn', 'GeminiAPI', `خطا در مدل [${modelCandidate}] (تلاش ${attempt}) - کد وضعیت: ${status} | پیام: ${errMsg}`, err);
+        addSystemLog('warn', 'GeminiAPI', `خطا در مدل [${modelCandidate}] (کد: ${status}) - سوییچ به نسخه بعدی جمینای...`, { error: errMsg });
         lastError = err;
 
         if (is503) {
-          addSystemLog('info', 'GeminiAPI', `مدل [${modelCandidate}] موقتاً با بار ترافیکی گوگل مواجه شد (503). سوییچ آنی به مدل فلش بعدی در صف...`);
-          break; // Immediately move to next candidate model without stalling
+          // Instant rollover without stalling to other Gemini versions (e.g. 3.1-flash-lite or 3.8-flash)
+          break;
         } else if (is429 && attempt === 1) {
-          addSystemLog('info', 'GeminiAPI', 'پاسخ 429 (سقف تعداد درخواست) دریافت شد. ایجاد تاخیر ۱ ثانیه‌ای قبل از تلاش مجدد...');
-          await new Promise((r) => setTimeout(r, 1000));
+          await new Promise((r) => setTimeout(r, 400));
         } else {
           break;
         }
@@ -166,7 +158,7 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
     }
   }
   
-  addSystemLog('error', 'GeminiAPI', 'تمام مدل‌های کاندید فلش با خطا مواجه شدند! رجوع به حالت پشتیبان آفلاین.', lastError);
+  addSystemLog('error', 'GeminiAPI', 'تمامی نسخه‌های جمینای با ترافیک موقت مواجه شدند. فعال‌سازی حالت داستانی هوشمند پشتیبان.', lastError);
   throw lastError || new Error('All Gemini candidate models failed.');
 }
 
@@ -817,7 +809,8 @@ ${caseData.title} | ${caseData.briefing}
   { "senderName": "نام دقیق کاراکتر سوم یا دوم", "text": "اعتراض تند بعدی..." }
 ]`;
 
-      const resAi = await generateAiContent(prompt, true, 0.9);
+      // Generate heated argument using the ultra-fast, token-saving LITE model pool
+      const resAi = await generateAiContent(prompt, true, 0.9, 800, MODEL_TIER_FAST_LITE);
       const argument = parseJsonFromAi<unknown>(resAi.text);
       res.json({ argument });
     } catch (error) {
@@ -864,7 +857,9 @@ ${caseData.title} | ${caseData.briefing}
     }
 
     try {
-      const historyStr = (history || [])
+      // Smart token reduction: keep only the last 8 recent dialogue exchanges
+      const recentHistory = (history || []).slice(-8);
+      const historyStr = recentHistory
         .map((h: { sender: string; text: string }) => `${h.sender}: ${h.text}`)
         .join('\n');
 
@@ -1028,7 +1023,7 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
   "culpritConfession": "جملات اعتراف یا واکنش نهایی مقصر در لحظه اعلام حکم"
 }`;
 
-      const resAi = await generateAiContent(evaluationPrompt, true, 0.7);
+      const resAi = await generateAiContent(evaluationPrompt, true, 0.7, 1000, MODEL_TIER_FAST_LITE);
       const parsed = parseJsonFromAi<Record<string, unknown>>(resAi.text);
       res.json(parsed);
     } catch (error) {
