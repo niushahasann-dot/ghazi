@@ -134,27 +134,27 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               soundManager.playPaperRustle();
               onStartConsultation();
             }}
-            className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#191c2b] via-[#141624] to-[#10121d] border border-purple-500/40 hover:border-purple-400/80 shadow-xl hover:shadow-purple-950/40 transition-all duration-200 cursor-pointer flex flex-col justify-between space-y-4 hover:-translate-y-0.5"
+            className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#191c2b] via-[#141624] to-[#10121d] border border-amber-500/40 hover:border-amber-400/80 shadow-xl hover:shadow-amber-950/40 transition-all duration-200 cursor-pointer flex flex-col justify-between space-y-4 hover:-translate-y-0.5"
           >
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
                 </div>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                  طراحی با جمینای
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  ساخت آنی با موضوع دلخواه
                 </span>
               </div>
-              <h3 className="text-lg font-bold text-stone-100 group-hover:text-purple-200 transition-colors">
-                طراحی پرونده سفارشی جدید
+              <h3 className="text-lg font-bold text-stone-100 group-hover:text-amber-200 transition-colors">
+                طراحی پرونده با تایپ موضوع دلخواه
               </h3>
               <p className="text-xs text-stone-400 leading-relaxed">
-                قبل از دادگاه با جمینای گفتگو کنید؛ نوع جنایت، الایبی و دروغ‌های متهم را تعیین کرده و پرونده‌ای کاملاً تازه بسازید.
+                فقط موضوع مورد نظرتان را تایپ کنید (مثل: قتل بازیکن فوتبال، مسمومیت در برج...) تا جمینای تمام اشخاص، سناریو و مدارک را بر اساس آن خلق کند.
               </p>
             </div>
 
-            <div className="pt-2 flex items-center justify-between text-xs font-bold text-purple-300 group-hover:text-purple-200 border-t border-purple-900/40">
-              <span>ورود به اتاق مشورت و ساخت سناریو</span>
+            <div className="pt-2 flex items-center justify-between text-xs font-bold text-amber-300 group-hover:text-amber-200 border-t border-amber-900/40">
+              <span>تایپ موضوع و خلق آنی پرونده</span>
               <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             </div>
           </button>

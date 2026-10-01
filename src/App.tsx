@@ -269,7 +269,7 @@ export default function App() {
 
               <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-amber-100">
                 <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>اتاق مشورت بازپرسی و طراحی پرونده با جمینای</span>
+                <span>طراحی آنی پرونده جدید با تایپ موضوع (جمینای)</span>
               </div>
             </div>
 

@@ -130,13 +130,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all cursor-pointer ${
               currentTab === 'consult'
-                ? 'bg-purple-900/30 text-purple-300 border border-purple-500/30 shadow-sm'
+                ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 shadow-sm'
                 : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span className="hidden sm:inline">مشورت با جمینای</span>
-            <span className="sm:hidden">طراحی</span>
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">➕ ساخت پرونده جدید با جمینای</span>
+            <span className="sm:hidden">جدید</span>
           </button>
         </nav>
 

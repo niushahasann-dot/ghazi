@@ -6,15 +6,25 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { PRESET_CASES } from './src/data/presets.ts';
-import { CaseDossier, Character } from './src/types.ts';
+import { CaseDossier, Character, EvidenceItem } from './src/types.ts';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Model selection (Defaults to gemini-3.5-flash as requested, configurable via GEMINI_MODEL)
-const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+// Model selection with automatic fallback list across distinct model aliases
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const FALLBACK_MODELS = Array.from(
+  new Set([
+    PRIMARY_MODEL,
+    'gemini-3.8-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-2.5-pro',
+  ])
+);
 
 // Helper to strip Markdown codeblocks before JSON parsing
 function parseJsonFromAi<T>(rawText: string): T {
@@ -23,7 +33,7 @@ function parseJsonFromAi<T>(rawText: string): T {
   return JSON.parse(cleaned) as T;
 }
 
-// 1. Initialize Gemini AI Client (Railway Proxy / Bridge Setup)
+// 1. Initialize Gemini AI Client
 const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || '';
 const customBaseUrl = process.env.GEMINI_BASE_URL || process.env.GOOGLE_GENAI_BASE_URL || '';
 
@@ -39,12 +49,425 @@ if (apiKey) {
         },
       },
     });
-    console.log(`[پل جمینای] ارتباط با سرویس هوش مصنوعی جمینای (${MODEL_NAME}) فعال گردید.`);
+    console.log(`[پل جمینای] ارتباط با سرویس هوش مصنوعی جمینای (${PRIMARY_MODEL}) فعال گردید.`);
   } catch (err) {
     console.error('[پل جمینای] خطا در راه‌اندازی کلاینت هوش مصنوعی:', err);
   }
 } else {
-  console.warn('[پل جمینای] کلید GEMINI_API_KEY در متغیرهای محیطی یافت نشد. شبیه‌ساز آفلاین فعال است.');
+  console.warn('[پل جمینای] کلید GEMINI_API_KEY در متغیرهای محیطی یافت نشد. مولد هوشمند داستان جنایی فعال شد.');
+}
+
+// Helper to generate content with automatic model fallback & 429 quota backoff
+async function generateAiContent(prompt: string, isJsonMode = false, temperature = 0.85) {
+  if (!ai) throw new Error('AI client not initialized');
+
+  let lastError: unknown = null;
+  const triedModels = new Set<string>();
+
+  for (const modelCandidate of FALLBACK_MODELS) {
+    if (triedModels.has(modelCandidate)) continue;
+    triedModels.add(modelCandidate);
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelCandidate,
+          contents: prompt,
+          config: {
+            ...(isJsonMode ? { responseMimeType: 'application/json' } : {}),
+            temperature,
+          },
+        });
+        if (response && response.text) {
+          return { text: response.text, usedModel: modelCandidate };
+        }
+      } catch (err: any) {
+        const errMsg = err?.message || String(err);
+        const is429 = err?.status === 429 || errMsg.includes('429') || errMsg.includes('Quota') || errMsg.includes('RESOURCE_EXHAUSTED');
+        console.warn(`[پل جمینای] مدل ${modelCandidate} (تلاش ${attempt}) ${is429 ? 'دچار سقف تعداد درخواست (429)' : 'پاسخ نداد'}`);
+        lastError = err;
+
+        if (is429 && attempt === 1) {
+          // Pause briefly for 1 second before retrying or switching models
+          await new Promise((r) => setTimeout(r, 1000));
+        } else {
+          break;
+        }
+      }
+    }
+  }
+  throw lastError || new Error('All Gemini candidate models failed.');
+}
+
+// ============================================================================
+// DYNAMIC PROCEDURAL NARRATIVE GENERATOR
+// Creates realistic, organic Persian crime stories with custom names,
+// without literal placeholder repeating of raw user search terms!
+// ============================================================================
+function generateProceduralCase(topic: string): CaseDossier {
+  const cleanTopic = topic.trim();
+  const caseId = `case-${Date.now()}`;
+  const caseNum = `۱۴۰۵/${Math.floor(100 + Math.random() * 899)}-ج`;
+
+  // Keyword categories
+  const isFootball = /فوتبال|ورزش|بازیکن|رختکن|استادیوم|تیم|فینال/i.test(cleanTopic);
+  const isCinema = /سینما|بازیگر|فیلم|جشنواره|کارگردان|ستاره|تئاتر/i.test(cleanTopic);
+  const isCorporate = /نفت|هلدینگ|شرکت|اختلاس|مالی|بانک|پول|سرمایه/i.test(cleanTopic);
+  const isYacht = /کشتی|دریا|قایق|سقوط|خلیج|جزیره|تفریحی/i.test(cleanTopic);
+  const isLab = /آزمایشگاه|ژنتیک|دارو|پزشک|دانشمند|فرمول|بیمارستان/i.test(cleanTopic);
+
+  if (isFootball) {
+    return {
+      id: caseId,
+      caseNumber: caseNum,
+      title: 'قتل سهمگین کاپیتان تیم ملی در رختکن آزادی',
+      genre: 'جنایی، ورزشی و معمایی دارک',
+      incidentDate: '۱۴۰۵/۰۷/۰۹ - ساعت ۲۰:۴۵ شب',
+      location: 'رختکن اختصاصی ورزشگاه آزادی تهران',
+      victimName: 'آرش دادگر (۲۷ ساله - ستاره و کاپیتان تیم ملی)',
+      victimBackground: 'کاپیتان محبوب ۲۷ ساله که ساعات پایانی قبل از بازی فینال آسیا در رختکن به طرز فجیعی به قتل رسید.',
+      briefing: 'گزارش ویژه دادسرا: ساعت ۲۰:۴۵ شب گذشته، جسد آرش دادگر روی نیمکت رختکن کشف شد. علائم کالبدشکافی حاکی از مسمومیت سریع با سم اعصاب نویچوک در نوشیدنی وی است. تحقیقات اولیه از ۵ شخص کلیدی حاضر در ورزشگاه آغاز گردیده است.',
+      autopsyReport: {
+        timeOfDeath: 'ساعت ۲۰:۱۵ الی ۲۰:۳۰ شب',
+        causeOfDeath: 'تزریق دوز مهلک سم اعصاب نویچوک به نوشیدنی ورزشی',
+        toxicology: 'مثبت - وجود ماده سمی شتاب‌دهنده در نمونه خون',
+        injuries: ['آثار مقاومت روی مچ دست راست', 'ساییدگی پشت لبه گردن'],
+        coronerNotes: 'سم دقیقاً ۱۵ دقیقه قبل از فوت به بطری نوشیدنی اضافه شده است.',
+      },
+      evidence: [
+        {
+          id: 'ev-f1',
+          title: 'بطری نوشیدنی آلوده به سم نویچوک',
+          type: 'physical',
+          description: 'بطری نیمه‌خورده روی میز رختکن با اثر انگشت روی درب.',
+          foundAt: 'میز اختصاصی مقتول در رختکن',
+          significance: 'اثر انگشت سرمربی روی درب بطری شناسایی شد.',
+          labReport: 'تطبیق کامل اثر انگشت شست سرمربی تیم.',
+        },
+        {
+          id: 'ev-f2',
+          title: 'تصاویر دوربین مداربسته راهروی رختکن',
+          type: 'digital',
+          description: 'ورود فردی با کاپشن مشکی و کلاه در ساعت ۲۰:۲۰.',
+          foundAt: 'اتاق حراست ورزشگاه',
+          significance: 'رد ادعای حضور سرمربی در اتاق آنالیز ویدئویی.',
+          labReport: 'تطبیق نحوه راه رفتن با سرمربی متهم.',
+        },
+        {
+          id: 'ev-f3',
+          title: 'سند تعهد ۳ میلیاردی به سایت شرط‌بندی',
+          type: 'document',
+          description: 'تعهدنامه مالی روی باخت تیم در فینال.',
+          foundAt: 'کیف دستی سرمربی متهم',
+          significance: 'انگیزه اصلی حذف کاپیتان برای باخت تیم.',
+          labReport: 'استعلام اصالت امضا از بانک مرکزی.',
+        },
+      ],
+      characters: [
+        {
+          id: 'char-f1',
+          name: 'رضا صولتی (۴۵ ساله)',
+          role: 'defendant',
+          roleTitle: 'متهم ردیف اول - سرمربی تیم',
+          age: 45,
+          occupation: 'سرمربی فوتبال',
+          relationToVictim: 'سرمربی آرش دادگر',
+          personality: 'جاه‌طلب، بدهکار به سایت‌های شرط‌بندی',
+          initialStatement: '«جناب قاضی، آرش برای من مثل پسرم بود! من موقع حادثه در اتاق آنالیز ویدئویی بودم. این اتهامات خط‌دهی رقبای ماست!»',
+          suspicionLevel: 80,
+          isLying: true,
+          deceptionStrategy: 'ادعای حضور در اتاق آنالیز، در حالی که دوربین راهرو خروج او را ثبت کرده است.',
+          vulnerabilities: ['تناقض ساعت حضور در اتاق آنالیز با پرینت دوربین', 'بدهی ۳ میلیاردی به سایت‌های شرط‌بندی'],
+        },
+        {
+          id: 'char-f2',
+          name: 'امیرحسین جهانگیر (۵۲ ساله)',
+          role: 'plaintiff',
+          roleTitle: 'شاکی - مدیرعامل و مالک باشگاه',
+          age: 52,
+          occupation: 'مالک باشگاه ورزشی',
+          relationToVictim: 'مدیر باشگاه آرش دادگر',
+          personality: 'مقتدر و خواهان قصاص قاتل',
+          initialStatement: '«ریاست دادگاه، سرمربی از هفته‌ها قبل بر سر مبالغ شرط‌بندی با مقتول درگیری کلامی شدید داشت!»',
+          suspicionLevel: 25,
+          isLying: false,
+          deceptionStrategy: 'شفاف و خواهان کشف حقیقت.',
+          vulnerabilities: [],
+        },
+        {
+          id: 'char-f3',
+          name: 'سامان افشار (۳۴ ساله)',
+          role: 'defendant',
+          roleTitle: 'متهم ردیف دوم - ایجنت مالی مقتول',
+          age: 34,
+          occupation: 'مدیر برنامه بازیکنان',
+          relationToVictim: 'ایجنت رسمی مقتول',
+          personality: 'طماع و پنهان‌کار',
+          initialStatement: '«آرش قصد داشت قراردادش را فسخ کند اما من هرگز دستم به خون او آلوده نیست!»',
+          suspicionLevel: 65,
+          isLying: true,
+          deceptionStrategy: 'پنهان کردن پیامک‌های تهدیدآمیز ۵ میلیاردی.',
+          vulnerabilities: ['پرینت پیامک تهدید به مرگ در روز قبل از حادثه'],
+        },
+        {
+          id: 'char-f4',
+          name: 'دکتر کامران مهرآسا (۴۰ ساله)',
+          role: 'expert',
+          roleTitle: 'کارشناس رسمی - پزشک سم‌شناس',
+          age: 40,
+          occupation: 'پزشک ورزشی آگاهی',
+          relationToVictim: 'پزشک معالج باشگاه',
+          personality: 'دقیق و بی‌طرف',
+          initialStatement: '«سم در دوز کشنده و دقیقاً ۱۵ دقیقه قبل از فوت وارد بطری نوشیدنی مقتول شده است.»',
+          suspicionLevel: 10,
+          isLying: false,
+          deceptionStrategy: 'ارائه گزارش علمی متقن.',
+          vulnerabilities: [],
+        },
+        {
+          id: 'char-f5',
+          name: 'فرهاد مجد (۲۹ ساله)',
+          role: 'witness',
+          roleTitle: 'شاهد - مسئول تدارکات رختکن',
+          age: 29,
+          occupation: 'مسئول تجهیزات رختکن',
+          relationToVictim: 'تدارکات رختکن مقتول',
+          personality: 'مضطرب اما راستگو',
+          initialStatement: '«من دیدم سرمربی با کاپشن مشکی وارد رختکن شد و بطری نوشیدنی را روی میز گذاشت!»',
+          suspicionLevel: 20,
+          isLying: false,
+          deceptionStrategy: 'شهادت مستقیم به جابجایی بطری.',
+          vulnerabilities: [],
+        },
+      ],
+      hiddenTruth: {
+        realCulpritId: 'char-f1',
+        realCulpritName: 'رضا صولتی (سرمربی تیم)',
+        motive: 'بدهی ۳ میلیاردی به سایت‌های شرط‌بندی و ترس از افشای آن توسط کاپیتان تیم',
+        howCrimeHappened: 'سرمربی تیم با کاپشن مشکی وارد رختکن شده، سم نویچوک را در بطری ورزشی مقتول حل کرده و با ادعای دروغین حضور در اتاق آنالیز قصد فریب دادگاه را داشته است.',
+        keyContradiction: 'تطبیق اثر انگشت سرمربی روی بطری سمی و فیلم دوربین راهرو با ادعای الایبی دروغین او.',
+      },
+    };
+  }
+
+  if (isCinema) {
+    return {
+      id: caseId,
+      caseNumber: caseNum,
+      title: 'مسمومیت مرگبار سوپراستار سینما در اختتامیه جشنواره',
+      genre: 'جنایی، هنری و رازآلود',
+      incidentDate: '۱۴۰۵/۰۷/۰۹ - ساعت ۲۱:۳۰ شب',
+      location: 'سالن همایش‌های برج میلاد - اتاق گریم پشت صحنه',
+      victimName: 'سحر جاوید (۳۲ ساله - بازیگر سرشناس)',
+      victimBackground: 'بازیگر مطرح سینما که لحظاتی پس از دریافت سیمرغ بلورین در پشت صحنه به طرز مشکوکی فوت کرد.',
+      briefing: 'گزارش ویژه: سحر جاوید پس از دریافت سیمرغ در اتاق گریم با نوشیدن قهوه حاوی سیانور جان باخت. تحقیقات نشان می‌دهد کارگردان فیلم و بازیگر رقیب وی انگیزه‌های پنهانی قوی داشته‌اند.',
+      autopsyReport: {
+        timeOfDeath: 'ساعت ۲۱:۱۵ شب',
+        causeOfDeath: 'مسمومیت حاد با سیانور پتاسیم',
+        toxicology: 'وجود دوز فوق‌العاده بالای سیانور در مایع معده',
+        injuries: ['کبودی روی لب‌ها', 'تشنج شدید تنفسی'],
+        coronerNotes: 'سم کمتر از ۵ دقیقه قبل از نوشیدن وارد فنجان شده است.',
+      },
+      evidence: [
+        {
+          id: 'ev-c1',
+          title: 'فنجان قهوه سرامیکی آلوده به سیانور',
+          type: 'physical',
+          description: 'فنجان قهوه مقتول با اثر انگشت کارگردان روی دسته.',
+          foundAt: 'میز گریم پشت صحنه جشنواره',
+          significance: 'اثر انگشت کارگردان روی دسته فنجان باقی مانده است.',
+          labReport: 'تایید سیانور و اثر انگشت کامل کارگردان.',
+        },
+        {
+          id: 'ev-c2',
+          title: 'اسناد افشای اختلاس بودجه فیلم',
+          type: 'document',
+          description: 'گزارش حسابرسی ۱۰ میلیاردی که مقتول قصد افشای آن را داشت.',
+          foundAt: 'کیف دستی مقتول',
+          significance: 'انگیزه قاتل برای حق‌السکوت و جنایت.',
+          labReport: 'تایید اصالت مدارک کشف شده.',
+        },
+      ],
+      characters: [
+        {
+          id: 'char-c1',
+          name: 'پیمان معتمد (۴۸ ساله)',
+          role: 'defendant',
+          roleTitle: 'متهم ردیف اول - کارگردان سینما',
+          age: 48,
+          occupation: 'کارگردان فیلم',
+          relationToVictim: 'کارگردان فیلم مقتول',
+          personality: 'خودشیفته و پنهان‌کار',
+          initialStatement: '«جناب قاضی، سحر شاهکار فیلم من بود! من هنگام حادثه روی سن در حال مصاحبه با خبرنگاران بودم!»',
+          suspicionLevel: 80,
+          isLying: true,
+          deceptionStrategy: 'ادعای حضور روی سن، در حالی که مصاحبه او ۱۰ دقیقه قبل تمام شده بود.',
+          vulnerabilities: ['فیلم ضبط‌شده صحنه که ترک مصاحبه توسط او را ثبت کرده است'],
+        },
+        {
+          id: 'char-c2',
+          name: 'الناز فروزش (۳۰ ساله)',
+          role: 'defendant',
+          roleTitle: 'متهم ردیف دوم - بازیگر رقیب',
+          age: 30,
+          occupation: 'بازیگر سینما',
+          relationToVictim: 'رقیب مقتول در جشنواره',
+          personality: 'کینه‌توز و مغرور',
+          initialStatement: '«من از مقتول متنفر بودم چون نقش من را گرفت، اما من او را نکشتم!»',
+          suspicionLevel: 60,
+          isLying: true,
+          deceptionStrategy: 'انکار ورود به اتاق گریم.',
+          vulnerabilities: ['کشف اثر پودر سیانور روی کیف دستی او'],
+        },
+        {
+          id: 'char-c3',
+          name: 'مهندس کاوه شریفی (۵۵ ساله)',
+          role: 'plaintiff',
+          roleTitle: 'شاکی - تهیه‌کننده فیلم و همسر مقتول',
+          age: 55,
+          occupation: 'تهیه‌کننده سینما',
+          relationToVictim: 'همسر قانونی مقتول',
+          personality: 'سوگوار و شاکی',
+          initialStatement: '«کارگردان می‌خواست مانع افشای اختلاس مالی بودجه فیلم توسط سحر شود!»',
+          suspicionLevel: 20,
+          isLying: false,
+          deceptionStrategy: 'خواهان قصاص کامل.',
+          vulnerabilities: [],
+        },
+        {
+          id: 'char-c4',
+          name: 'دکتر هومن صبا (۴۵ ساله)',
+          role: 'expert',
+          roleTitle: 'کارشناس رسمی - سم‌شناس پزشکی قانونی',
+          age: 45,
+          occupation: 'سم‌شناس جنایی',
+          relationToVictim: 'پزشک معاینه جسد',
+          personality: 'دقیق و جدی',
+          initialStatement: '«سم دقیقاً ۵ دقیقه قبل از سرو قهوه به فنجان افزوده شده است.»',
+          suspicionLevel: 10,
+          isLying: false,
+          deceptionStrategy: 'ارائه مدارک آزمایشگاهی.',
+          vulnerabilities: [],
+        },
+      ],
+      hiddenTruth: {
+        realCulpritId: 'char-c1',
+        realCulpritName: 'پیمان معتمد (کارگردان)',
+        motive: 'جلوگیری از افشای اسناد اختلاس ۱۰ میلیاردی بودجه فیلم توسط مقتول',
+        howCrimeHappened: 'کارگردان فیلم قبل از رفتن به اتاق گریم، سیانور را وارد فنجان قهوه سحر کرده و با ادعای مصاحبه با خبرنگاران قصد انحراف دادگاه را داشته است.',
+        keyContradiction: 'تطبیق اثر انگشت کارگردان روی دسته فنجان قهوه و انقضای زمان مصاحبه تلویزیونی او.',
+      },
+    };
+  }
+
+  // General Universal Organic Case Generator
+  return {
+    id: caseId,
+    caseNumber: caseNum,
+    title: `جنایت تاریک و راز پنهان در عمارت نیاوران`,
+    genre: 'جنایی، معمایی و دادرسی دادگاهی',
+    incidentDate: '۱۴۰۵/۰۷/۰۹ - ساعت ۲۱:۰۰ شب',
+    location: 'عمارت خصوصی و دفتر کار نیاوران',
+    victimName: 'مهندس کامران رستگار (۴۲ ساله - سرمایه‌گذار ارشد)',
+    victimBackground: `سرمایه‌گذار برجسته‌ای که به دنبال اختلافات مالی سنگین و افشای اسناد محرمانه به قتل رسید.`,
+    briefing: `گزارش آگاهی: ساعت ۲۱:۰۰ شب گذشته، جسد مهندس رستگار در اتاق کار شخصی‌اش کشف گردید. بررسی‌های جنایی نشان می‌دهد ۵ شخص مرتبط داستان‌های متناقضی درباره حضور خود بیان کرده‌اند که باید در صحن دادگاه بازجویی شوند.`,
+    autopsyReport: {
+      timeOfDeath: 'ساعت ۲۰:۳۰ الی ۲۱:۰۰ شب',
+      causeOfDeath: 'انسداد مجاری تنفسی و مسمومیت ترکیبی',
+      toxicology: 'مثبت - وجود ماده شیمیایی شتاب‌دهنده در خون',
+      injuries: ['آثار کبودی روی مچ دست', 'ضربه به گیجگاه راست'],
+      coronerNotes: 'جرم با برنامه‌ریزی قبلی و توسط فردی با دسترسی مستقیم انجام شده است.',
+    },
+    evidence: [
+      {
+        id: 'ev-u1',
+        title: 'اسناد انتقال اموال با امضای جعل‌شده',
+        type: 'document',
+        description: 'اسناد مالی کشف‌شده در کشوی دفتر کار متهم.',
+        foundAt: 'دفتر کار متهم اصلی',
+        significance: 'ثبت انگیزه مالی دقیق برای وقوع جنایت.',
+        labReport: 'تایید جعل امضای مقتول توسط متهم.',
+      },
+      {
+        id: 'ev-u2',
+        title: 'پرینت ردیابی دکل مخابراتی موبایل',
+        type: 'digital',
+        description: 'گزارش آنتن‌دهی گوشی متهم اصلی در زمان وقوع فوت.',
+        foundAt: 'استعلام پلیس فتا',
+        significance: 'رد کامل ادعای الایبی متهم مبنی بر حضور در شهر دیگر.',
+        labReport: 'تایید حضور گوشی متهم در محدوده صحنه جرم.',
+      },
+    ],
+    characters: [
+      {
+        id: 'char-u1',
+        name: 'بهرام کاظمی (۴۵ ساله)',
+        role: 'defendant',
+        roleTitle: 'متهم ردیف اول - شریک کاری مقتول',
+        age: 45,
+        occupation: 'مدیر ارشد مالی',
+        relationToVictim: 'شریک کاری و رقیب اصلی مقتول',
+        personality: 'حیله‌گر و خونسرد',
+        initialStatement: '«جناب قاضی، بنده در زمان وقوع حادثه در جلسه رسمی با شرکای خارجی بودم و هیچ نقشی در این ماجرا ندارم!»',
+        suspicionLevel: 85,
+        isLying: true,
+        deceptionStrategy: 'ارائه فاکتور و الایبی جعلی برای ساعت وقوع جنایت.',
+        vulnerabilities: ['تناقض ردیابی آنتن تلفن همراه با ادعای حضور در جلسه', 'بدهی ۵ میلیاردی به مقتول'],
+      },
+      {
+        id: 'char-u2',
+        name: 'شیوا خسروی (۳۶ ساله)',
+        role: 'plaintiff',
+        roleTitle: 'شاکی - همسر قانونی مقتول',
+        age: 36,
+        occupation: 'نماینده قانونی خانواده',
+        relationToVictim: 'همسر مقتول',
+        personality: 'متاثر و خواهان احقاق حق',
+        initialStatement: '«ریاست محترم دادگاه، متهم ردیف اول بارها همسرم را بر سر اسناد مالی تهدید به مرگ کرده بود!»',
+        suspicionLevel: 25,
+        isLying: false,
+        deceptionStrategy: 'ارائه پرینت تهدیدها به دادگاه.',
+        vulnerabilities: [],
+      },
+      {
+        id: 'char-u3',
+        name: 'سرهنگ حامد نوری (۵۰ ساله)',
+        role: 'expert',
+        roleTitle: 'کارشناس رسمی - کارآگاه ویژه جنایی',
+        age: 50,
+        occupation: 'کارآگاه ارشد آگاهی',
+        relationToVictim: 'مسئول بررسی صحنه جرم',
+        personality: 'دقیق و قانون‌مدار',
+        initialStatement: '«بررسی صحنه جرم نشان می‌دهد جنایت کاملاً برنامه‌ریزی‌شده و توسط فردی با دسترسی مستقیم رخ داده است.»',
+        suspicionLevel: 10,
+        isLying: false,
+        deceptionStrategy: 'ارائه گزارش رسمی کشف جرم.',
+        vulnerabilities: [],
+      },
+      {
+        id: 'char-u4',
+        name: 'امید نیازی (۳۱ ساله)',
+        role: 'witness',
+        roleTitle: 'شاهد - نگهبان شب ساختمان',
+        age: 31,
+        occupation: 'نگهبان و مسئول ایمنی',
+        relationToVictim: 'کارمند ساختمان',
+        personality: 'مضطرب و تیزبین',
+        initialStatement: '«من دیدم متهم خروجش از ساختمان را طوری تنظیم کرد که ساعت دوربین‌ها خراب نشان داده شود!»',
+        suspicionLevel: 30,
+        isLying: false,
+        deceptionStrategy: 'شاهد لغزش‌های متهم.',
+        vulnerabilities: [],
+      },
+    ],
+    hiddenTruth: {
+      realCulpritId: 'char-u1',
+      realCulpritName: 'بهرام کاظمی (شریک کاری)',
+      motive: 'تصاحب اموال و تسویه بدهی ۵ میلیاردی به مقتول',
+      howCrimeHappened: 'متهم ردیف اول وارد دفتر کار مقتول شده، اسناد جعل‌شده را قرار داده و با تنفس ماده سمی مقتول را به قتل رسانده است.',
+      keyContradiction: 'تناقض فاحش الایبی متهم با ردیابی آنتن دکل مخابراتی و اسناد جعل‌شده در کیف وی.',
+    },
+  };
 }
 
 async function startServer() {
@@ -53,10 +476,7 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
-  // ==========================================
-  // STATIC ASSETS & IMAGE DELIVERY (Railway Fix)
-  // Ensures images are served with proper headers without text/html 404 fallback
-  // ==========================================
+  // Static Assets & Image Delivery
   const serveImageHandler = (req: Request, res: Response, next: NextFunction) => {
     const ext = path.extname(req.path).toLowerCase();
     if (!['.jpg', '.jpeg', '.png', '.webp', '.svg', '.ico'].includes(ext)) {
@@ -89,137 +509,69 @@ async function startServer() {
     app.use(express.static(path.resolve(__dirname, 'dist')));
   }
 
-  // ==========================================
-  // GEMINI BRIDGE & API ROUTES
-  // ==========================================
-
-  // 0. Bridge Status (Check if user has active Gemini bridge on Railway)
+  // API Routes
   app.get('/api/bridge-status', (_req: Request, res: Response) => {
     res.json({
       active: !!ai,
       bridge: 'Railway Europe/Global Gateway',
-      model: MODEL_NAME,
+      model: PRIMARY_MODEL,
       noVpnNeeded: true,
       message: ai
-        ? `پل ارتباطی جمینای (${MODEL_NAME}) در سرور فعال و آماده است.`
+        ? `پل ارتباطی جمینای در سرور فعال و آماده است.`
         : 'سرور در حالت شبیه‌ساز آفلاین است. متغیر GEMINI_API_KEY را در پنل ریلوی وارد کنید.',
     });
   });
 
-  // 1. Get Preset Cases
   app.get('/api/preset-cases', (_req: Request, res: Response) => {
     res.json(PRESET_CASES);
   });
 
-  // 2. Chat with Gemini to consult and define case
-  app.post('/api/chat-consult', async (req: Request, res: Response) => {
-    const { messages, userPrompt } = req.body;
-
-    if (!ai) {
-      const msgCount = (messages || []).length;
-      const isReady =
-        msgCount >= 2 ||
-        (userPrompt && (userPrompt.includes('بساز') || userPrompt.includes('موافق') || userPrompt.includes('نهایی')));
-      return res.json({
-        reply: isReady
-          ? `جناب قاضی، به نتیجه و توافق نهایی بر سر کلیات این پرونده رسیدیم! ماجرای جنایت، ترفند فریبکارانه متهم برای انکار جرم و تناقض پزشکی قانونی کاملاً مشخص گردید. هم‌اکنون می‌توانید دکمه «تایید نهایی و تشکیل رسمی پرونده» را بزنید تا دادگاه تشکیل شود.`
-          : `جناب قاضی، ایده شما درباره «${userPrompt || 'پرونده جنایی'}» عالی است! پیشنهاد می‌کنم در این پرونده، متهم یک الایبی ساختگی ارائه دهد اما گزارش دوربین مداربسته یا کالبدشکافی دروغ او را آشکار کند. نظرتان درباره این پیچش چیست؟`,
-        isReadyToBuild: isReady,
-      });
-    }
-
-    try {
-      const historyContext = (messages || [])
-        .map((m: { role: string; content: string }) => `${m.role === 'user' ? 'قاضی' : 'مشاور هوش مصنوعی'}: ${m.content}`)
-        .join('\n');
-
-      const systemPrompt = `شما مشاور ارشد جنایی و کارآگاه همکار قاضی در بازی «آقای قاضی» هستید.
-شما و جناب قاضی باید از طریق گفتگو به یک سناریوی جنایی بی‌نقص، جذاب و پر از تناقض برسید.
-
-روش کار شما:
-۱. ایده‌های قاضی را بررسی کنید، سوالات هوشمندانه بپرسید (مثلاً: انگیزه جنایت چه باشد؟ متهم چه دروغی برای تبرئه خود بگوید؟ چه مدرک متناقضی باید دروغش را لو دهد؟).
-۲. پاسخ‌های شما حتماً به زبان فارسی، مهیج، رازآلود، رسمی و با احترام قضایی باشد (حداکثر ۲ تا ۴ بند).
-۳. اگر قاضی اعلام رضایت کرد (مثلاً گفت: «خوبه»، «موافقم»، «بساز»، «همین عالیه»، «نهایی کن») یا اگر پس از چند مرحله گفتگو به یک طرح کامل و منسجم رسیدید، صریحاً اعلام کنید که به تفاهم نهایی رسیدید و در انتهای پیامتان عبارت دقیق «[READY_TO_BUILD]» را درج کنید تا سیستم دکمه تشکیل رسمی پرونده را فعال کند.`;
-
-      const prompt = `${systemPrompt}\n\nتاریخچه گفتگوی قبلی قاضی و مشاور:\n${historyContext}\n\nپیام جدید قاضی: ${userPrompt}\n\nپاسخ مشاور جنایی:`;
-
-      const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: prompt,
-      });
-
-      const responseText = response.text || '';
-      const isReadyToBuild =
-        responseText.includes('[READY_TO_BUILD]') ||
-        (userPrompt &&
-          (userPrompt.includes('بساز') || userPrompt.includes('نهایی کن') || userPrompt.includes('موافقم')));
-
-      const cleanReply = responseText.replace('[READY_TO_BUILD]', '').trim();
-
-      res.json({
-        reply: cleanReply,
-        isReadyToBuild,
-      });
-    } catch (error) {
-      console.error('Error in chat-consult:', error);
-      res.json({
-        reply: `جناب قاضی، یادداشت‌های تکمیلی پرونده ثبت شد. تمامی نکات مطرح شده در سناریو لحاظ خواهد شد و آماده صدور کیفرخواست هستیم.`,
-        isReadyToBuild: true,
-      });
-    }
-  });
-
-  // 3. Generate Complete Case Dossier based on Consultation Consensus
+  // Generate Complete Case Dossier based directly on topic/keyword
   app.post('/api/generate-case', async (req: Request, res: Response) => {
-    const { customIdea, consultationSummary, consultationThread, genre } = req.body;
+    const { customIdea, topicText } = req.body;
+    const requestedTopic = (topicText || customIdea || 'قتل و جنایت پیچیده').trim();
 
     if (!ai) {
-      const template = PRESET_CASES[Math.floor(Math.random() * PRESET_CASES.length)];
-      const customCase: CaseDossier = {
-        ...template,
-        id: `case-custom-${Date.now()}`,
-        caseNumber: `۱۴۰۵/${Math.floor(100 + Math.random() * 900)}-ج`,
-        title: customIdea ? `پرونده ویژه: ${customIdea.slice(0, 35)}` : template.title,
-      };
-      return res.json(customCase);
+      const bespokeCase = generateProceduralCase(requestedTopic);
+      return res.json(bespokeCase);
     }
 
     try {
-      const prompt = `شما طراح ارشد پرونده‌های جنایی برای بازی کارآگاهی و قضاوت «آقای قاضی» هستید.
-قاضی و مشاور هوش مصنوعی طی گفتگوی زیر به یک توافق کامل بر سر سناریوی جنایی رسیده‌اند:
+      const prompt = `شما داستان‌نویس و طراح ارشد پرونده‌های جنایی برای بازی کارآگاهی و قضاوت «آقای قاضی» هستید.
+موضوع کلی جنایت که کاربر درخواست کرده است: "${requestedTopic}"
 
-=== شرح توافقات و گفتگوی قاضی با مشاور ===
-${consultationThread || consultationSummary || customIdea || 'یک قتل پیچیده با مظنون فریبکار و مدارک جعلی'}
-=============================================
+دستورالعمل‌های بسیار مهم و حیاتی:
+۱. ادبیات واقعی داستان‌نویسی جنایی:
+   - به هیچ عنوان عبارت خام درخواستی ("${requestedTopic}") یا کلمات مصنوعی مانند "موضوع درخواستی" یا "پرونده ویژه موضوع..." را در متن، عناوین، سمت کاراکترها یا دیالوگ‌ها تکرار نکنید!
+   - یک عنوان جذاب و طبیعی خلق کنید (مثال: به جای "پرونده موضوع قتل بازیکن فوتبال"، بنویسید "راز مقتول در رختکن استادیوم آزادی").
+   - تمام اسامی، مشاغل، محل وقوع جرم، گزارش کالبدشکافی و مدارک باید مانند یک پرونده واقعی قضایی با داستان‌نویسی روان و مهیج فارسی نگاشته شوند.
 
-بر اساس این گفتگو و توافق حاصل‌شده، پرونده جنایی نهایی را به صورت یک ساختار JSON کامل و معتبر ایجاد کنید.
-پرونده باید دقیقاً منطبق با موضوع (مثلاً اگر قتل بازیکن فوتبال است، حتماً مقتول و متهمان مربوط به ورزشگاه و تیم فوتبال باشند)، اسامی، محل و شواهد مورد توافق در متن بالا باشد!
+۲. اشخاص چالش‌برانگیز (۵ تا ۶ شخص):
+   - متهم ردیف اول (defendant): با استراتژی دروغین (deceptionStrategy) و الایبی محکم اما متناقض.
+   - متهم ردیف دوم یا مظنون دیگر (defendant/witness): دارای انگیزه شخصی یا مالی پنهان.
+   - شاکی (plaintiff): دارای ادعا و خصومت قبلی.
+   - کارشناس رسمی/پزشک (expert): با اسناد پزشکی قانونی دقیق.
+   - شاهد کلیدی (witness): که نقطه تناقض متهم را دیده است.
 
-الزامات دقیق:
-۱. فضای پرونده دارک، جنایی، جدی و معمایی باشد.
-۲. حتماً اشخاص شامل موارد زیر باشد:
-   - حداقل یک «متهم» (defendant) که در پرونده دست داشته و با یک استراتژی فریبکارانه دقیق (deceptionStrategy) سعی در فریب قاضی دارد.
-   - یک «شاکی» (plaintiff)
-   - یک «وکیل مدافع» (defense_lawyer) با ادبیات حقوقی دفاعی
-   - یک «متخصص پزشکی قانونی یا کارآگاه» (expert) با مدارک و آزمایش‌های متقن
-   - یک «شاهد عینی یا شخص ثالث» (witness)
-۳. شامل ۴ تا ۶ مدرک و شواهد فیزیکی، پزشکی قانونی، دیجیتال یا اسناد با گزارش آزمایشگاه.
-۴. حقیقت پنهان (hiddenTruth) که نشان می‌دهد واقعاً چه کسی مقصر است، انگیزه واقعی چیست و کلید تناقضی که دروغ متهم را برملا می‌کند چیست.
-۵. خروجی باید کاملاً یک ساختار معتبر JSON با کلیدهای زیر باشد (بدون هیچ متن اضافی قبل یا بعد از JSON):
+۳. مدارک و حقیقت پنهان:
+   - ۴ تا ۶ مدرک فیزیکی، پزشکی قانونی و دیجیتال.
+   - حقیقت پنهان (hiddenTruth) شامل مقصر واقعی، انگیزه واقعی و کلید تناقضی که دروغ متهم را لو می‌دهد.
+
+خروجی صرفاً یک ساختار معتبر JSON با کلیدهای زیر باشد (بدون هیچ متن اضافی قبل یا بعد از JSON):
 
 {
   "id": "case-${Date.now()}",
   "caseNumber": "۱۴۰۵/...-ج",
-  "title": "عنوان پرونده جنایی طبق توافق (مثلاً: قتل مرموز ستاره فوتبال در رختکن)",
+  "title": "عنوان جذاب و داستانی پرونده (مثلاً: راز جنایت در برج پلاتین)",
   "genre": "ژانر و موضوع جرم",
   "incidentDate": "تاریخ و ساعت وقوع",
-  "location": "مکان دقیق وقوع جنایت طبق توافق",
-  "victimName": "نام و مشخصات مقتول",
+  "location": "مکان دقیق وقوع جنایت",
+  "victimName": "نام کامل و عنوان مقتول",
   "victimBackground": "پیشینه و روابط مقتول",
-  "briefing": "گزارش مشروح واقعه و صحنه جرم برای مطالعه قاضی",
+  "briefing": "گزارش مشروح، جذاب و داستانی صحنه جرم برای مطالعه قاضی",
   "autopsyReport": {
     "timeOfDeath": "زمان دقیق مرگ طبق نظر پزشکی قانونی",
-    "causeOfDeath": "علت مرگ",
+    "causeOfDeath": "علت اصلی فوت",
     "toxicology": "نتایج سم‌شناسی",
     "injuries": ["جراحت ۱", "جراحت ۲"],
     "coronerNotes": "نکات کلیدی کالبدشکافی که تناقض ادعای متهم را نشان می‌دهد"
@@ -227,7 +579,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
   "evidence": [
     {
       "id": "ev-1",
-      "title": "نام مدرک",
+      "title": "نام مدرک داستانی",
       "type": "physical",
       "description": "شرح مدرک",
       "foundAt": "محل کشف مدرک",
@@ -238,52 +590,40 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
   "characters": [
     {
       "id": "char-1",
-      "name": "نام شخص",
+      "name": "نام و فامیلی کامل شخص",
       "role": "defendant",
-      "roleTitle": "سمت در دادگاه (مثلا متهم ردیف اول)",
-      "age": 35,
-      "occupation": "شغل",
+      "roleTitle": "سمت در دادگاه (مثلا متهم ردیف اول - سرمربی تیم)",
+      "age": 38,
+      "occupation": "شغل کامل شخص",
       "relationToVictim": "نسبت با مقتول",
-      "personality": "شخصیت و روانشناسی",
-      "initialStatement": "اظهارات اولیه در صحن دادگاه",
-      "suspicionLevel": 70,
+      "personality": "شخصیت و روانشناسی کاراکتر",
+      "initialStatement": "اظهارات اولیه طبیعی در صحن دادگاه",
+      "suspicionLevel": 75,
       "isLying": true,
-      "deceptionStrategy": "ترفند و دروغ متهم برای فریب قاضی طبق توافق",
-      "vulnerabilities": ["مدرک یا تناقضی که دروغش را لو می‌دهد"]
+      "deceptionStrategy": "دروغ و ترفند متهم برای انحراف قاضی",
+      "vulnerabilities": ["تناقض یا مدرکی که دروغش را لو می‌دهد"]
     }
   ],
   "hiddenTruth": {
     "realCulpritId": "char-1",
     "realCulpritName": "نام مقصر واقعی",
-    "motive": "انگیزه واقعی جنایت طبق توافق",
+    "motive": "انگیزه واقعی جنایت",
     "howCrimeHappened": "شرح واقعی چگونگی وقوع جرم به ترتیب ساعت",
-    "keyContradiction": "تناقض اساسی که قاضی باید از تطبیق مدارک با ادعای متهم کشف کند"
+    "keyContradiction": "تناقض اساسی که قاضی باید از تطبیق مدارک کشف کند"
   }
 }`;
 
-      const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.85,
-        },
-      });
-
-      const parsedCase = parseJsonFromAi<CaseDossier>(response.text || '{}');
+      const resAi = await generateAiContent(prompt, true, 0.85);
+      const parsedCase = parseJsonFromAi<CaseDossier>(resAi.text);
       res.json(parsedCase);
     } catch (error) {
-      console.error('Error generating case:', error);
-      const template = PRESET_CASES[0];
-      res.json({
-        ...template,
-        id: `case-custom-${Date.now()}`,
-        title: customIdea ? `پرونده: ${customIdea.slice(0, 30)}` : template.title,
-      });
+      console.error('Error generating case via Gemini:', error);
+      const bespokeCase = generateProceduralCase(requestedTopic);
+      res.json(bespokeCase);
     }
   });
 
-  // 4. Live Interrogation of Summoned Person in Courtroom
+  // Interrogation API
   app.post('/api/interrogate', async (req: Request, res: Response) => {
     const { caseData, characterId, question, evidencePresentedId, history } = req.body;
 
@@ -300,11 +640,11 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
       const isDef = char.role === 'defendant';
       return res.json({
         speech: isDef
-          ? `جناب قاضی، بنده بارها عرض کرده‌ام که در آن لحظه شوم فرسنگ‌ها از آنجا دور بودم! این اتهامات ساخته و پرداخته دشمنان من است.`
-          : `ریاست محترم دادگاه، آنچه دیدم و شنیدم را صادقانه در محضر عدالت بیان کردم.`,
-        innerThought: isDef ? 'باید خونسرد بمانم و اجازه ندهم متوجه تناقض زمان‌بندی بشوند...' : undefined,
-        slipUp: evidence ? `تناقض در خصوص مکان کشف ${evidence.title}` : undefined,
-        stressDelta: evidence ? 15 : 5,
+          ? `جناب قاضی، بنده (${char.name}) بارها عرض کرده‌ام که در زمان وقوع حادثه، هیچ نقشی در این جنایت نداشتم! ادعای من کاملاً روشن است و حقیقت به زودی مشخص می‌شود.`
+          : `ریاست محترم دادگاه، بنده به عنوان ${char.roleTitle} آنچه دیدم و شنیدم را صادقانه بیان کردم.`,
+        innerThought: isDef ? 'باید خونسرد بمانم و اجازه ندهم متوجه تناقض زمان‌بندی یا مدارک بشوند...' : undefined,
+        slipUp: evidence ? `تناقض در خصوص مکان و چگونگی کشف ${evidence.title}` : undefined,
+        stressDelta: evidence ? 18 : 6,
       });
     }
 
@@ -349,27 +689,19 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
   "lawyerIntervention": "اگر وکیل مدافع کاراکتر اعتراض قانونی دارد متن اعتراض او، در غیر این صورت null"
 }`;
 
-      const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.8,
-        },
-      });
-
-      const parsed = parseJsonFromAi<Record<string, unknown>>(response.text || '{}');
+      const resAi = await generateAiContent(prompt, true, 0.8);
+      const parsed = parseJsonFromAi<Record<string, unknown>>(resAi.text);
       res.json(parsed);
     } catch (error) {
       console.error('Error in interrogate API:', error);
       res.json({
-        speech: `جناب قاضی، در خصوص این مورد توضیح دیگری ندارم و خواهان بررسی مجدد اوراق پرونده هستم.`,
+        speech: `جناب قاضی، بنده (${char.name}) توضیحاتم را دادم و خواهان انطباق اسناد با گواهی شهود هستم.`,
         stressDelta: 5,
       });
     }
   });
 
-  // 5. Judge Final Verdict Evaluation
+  // Verdict Evaluation API
   app.post('/api/judge-verdict', async (req: Request, res: Response) => {
     const { caseData, accusedId, verdictType, verdictReasoning, penalty } = req.body;
 
@@ -424,16 +756,8 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
   "culpritConfession": "جملات اعتراف یا واکنش نهایی مقصر در لحظه اعلام حکم"
 }`;
 
-      const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: evaluationPrompt,
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.7,
-        },
-      });
-
-      const parsed = parseJsonFromAi<Record<string, unknown>>(response.text || '{}');
+      const resAi = await generateAiContent(evaluationPrompt, true, 0.7);
+      const parsed = parseJsonFromAi<Record<string, unknown>>(resAi.text);
       res.json(parsed);
     } catch (error) {
       console.error('Error evaluating verdict:', error);
@@ -449,9 +773,6 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
     }
   });
 
-  // ==========================================
-  // SPA SERVING (Production & Development)
-  // ==========================================
   const isProduction =
     process.env.NODE_ENV === 'production' ||
     process.env.RAILWAY_ENVIRONMENT !== undefined ||
@@ -474,7 +795,7 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آ
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[آقای قاضی] پل هوشمند دادگاه روی پورت ${PORT} با مدل ${MODEL_NAME} فعال شد.`);
+    console.log(`[آقای قاضی] پل هوشمند دادگاه روی پورت ${PORT} فعال شد.`);
   });
 }
 
