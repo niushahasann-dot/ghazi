@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { CaseDossier, EvidenceItem, Character } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
+import { getDynamicCaseLabels } from '../utils/caseHeaders.ts';
 import { EvidenceInspectModal } from './EvidenceInspectModal.tsx';
 import { OfficialJudicialSheet } from './OfficialJudicialSheet.tsx';
 
@@ -35,6 +36,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
 }) => {
   const [inspectedEvidence, setInspectedEvidence] = useState<EvidenceItem | null>(null);
   const [showIndictmentSheet, setShowIndictmentSheet] = useState(false);
+  const labels = getDynamicCaseLabels(caseData);
 
   const getRoleBadge = (role: Character['role']) => {
     switch (role) {
@@ -57,7 +59,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#181a24] via-[#141620] to-[#0f1017] border border-amber-900/30 p-6 md:p-8 shadow-2xl">
         <div className="absolute -top-12 -left-12 w-48 h-48 bg-amber-600/5 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-4 left-6 border-2 border-red-700/50 bg-red-950/20 text-red-400 px-4 py-1.5 rounded-lg text-xs md:text-sm font-bold tracking-widest uppercase -rotate-2 select-none shadow">
-          محرمانه - دادگاه جنایی
+          {labels.caseClassification}
         </div>
 
         <div className="max-w-3xl space-y-3">
@@ -135,14 +137,14 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
           <div className="rounded-2xl bg-[#141622] border border-stone-800/80 p-6 shadow-xl space-y-4">
             <div className="flex items-center gap-2.5 text-amber-400 font-bold text-base border-b border-stone-800 pb-3">
               <FileText className="w-5 h-5 text-amber-400" />
-              <h3>گزارش کلانتری و بازپرس ویژه قتل</h3>
+              <h3>{labels.investigationTitle}</h3>
             </div>
 
             {/* Victim Profile */}
             <div className="p-4 rounded-xl bg-[#1a1c2b] border border-stone-800 space-y-2">
               <div className="flex items-center gap-2 text-sm font-semibold text-stone-200">
                 <User className="w-4 h-4 text-red-400" />
-                <span>مشخصات مقتول: {caseData.victimName}</span>
+                <span>{labels.victimOrPartyLabel} {caseData.victimName}</span>
               </div>
               <p className="text-xs text-stone-400 leading-relaxed">
                 {caseData.victimBackground}
@@ -151,38 +153,38 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
 
             {/* Briefing Narrative */}
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-stone-400">شرح واقعه و مشاهدات صحنه جنایت:</h4>
+              <h4 className="text-xs font-semibold text-stone-400">{labels.briefingTitle}</h4>
               <p className="text-sm text-stone-300 leading-relaxed bg-[#11131c] p-4 rounded-xl border border-stone-850 whitespace-pre-line">
                 {caseData.briefing}
               </p>
             </div>
           </div>
 
-          {/* Autopsy & Forensics Report */}
+          {/* Expert & Forensics Report */}
           <div className="rounded-2xl bg-[#141622] border border-emerald-900/30 p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-stone-800 pb-3">
               <div className="flex items-center gap-2.5 text-emerald-400 font-bold text-base">
                 <FlaskConical className="w-5 h-5 text-emerald-400" />
-                <h3>گزارش پزشکی قانونی و تالار تشریح</h3>
+                <h3>{labels.expertReportTitle}</h3>
               </div>
               <span className="text-xs text-emerald-400/80 px-2.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 font-mono">
-                مستندات آزمایشگاهی
+                {labels.expertBadge}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-[#191c28] border border-stone-800">
-                <span className="text-stone-400 block mb-1 font-medium">زمان تقریبی مرگ:</span>
+                <span className="text-stone-400 block mb-1 font-medium">{labels.timeLabel}</span>
                 <span className="text-stone-200 font-semibold">{caseData.autopsyReport.timeOfDeath}</span>
               </div>
               <div className="p-3 rounded-xl bg-[#191c28] border border-stone-800">
-                <span className="text-stone-400 block mb-1 font-medium">علت مستقیم فوت:</span>
+                <span className="text-stone-400 block mb-1 font-medium">{labels.causeOrMethodLabel}</span>
                 <span className="text-red-300 font-semibold">{caseData.autopsyReport.causeOfDeath}</span>
               </div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-[#191c28] border border-stone-800 space-y-1">
-              <span className="text-xs text-stone-400 font-medium block">نتایج آنالیز سم‌شناسی:</span>
+              <span className="text-xs text-stone-400 font-medium block">{labels.analysisLabel}</span>
               <p className="text-xs text-amber-200/90 leading-relaxed">
                 {caseData.autopsyReport.toxicology}
               </p>
@@ -190,7 +192,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
 
             {caseData.autopsyReport.injuries && caseData.autopsyReport.injuries.length > 0 && (
               <div className="space-y-1.5">
-                <span className="text-xs text-stone-400 font-medium block">جراحات و صدمات ظاهری مکشوفه:</span>
+                <span className="text-xs text-stone-400 font-medium block">{labels.damagesOrInjuriesLabel}</span>
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   {caseData.autopsyReport.injuries.map((inj, idx) => (
                     <li
@@ -206,7 +208,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
             )}
 
             <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-600/30 text-emerald-200 text-xs leading-relaxed">
-              <span className="font-bold block mb-1">نکته حیاتی پزشک قانونی:</span>
+              <span className="font-bold block mb-1">{labels.expertNoteLabel}</span>
               {caseData.autopsyReport.coronerNotes}
             </div>
           </div>
@@ -300,7 +302,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
 
                 <div className="space-y-1 text-xs text-stone-300 bg-[#10121d] p-3 rounded-xl border border-stone-850">
                   <p className="truncate"><strong className="text-stone-400">شغل:</strong> {char.occupation}</p>
-                  <p className="truncate"><strong className="text-stone-400">رابطه با مقتول:</strong> {char.relationToVictim}</p>
+                  <p className="truncate"><strong className="text-stone-400">{labels.relationLabel}</strong> {char.relationToVictim}</p>
                   <p className="truncate">
                     <strong className="text-stone-400">مزاج و روحیات:</strong>{' '}
                     <span className={char.temperament === 'anxious' ? 'text-red-400 font-bold animate-pulse' : char.temperament === 'calm' ? 'text-emerald-400' : 'text-stone-300'}>

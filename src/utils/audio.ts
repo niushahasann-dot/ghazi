@@ -1,14 +1,24 @@
 /**
- * Web Audio API synthesizer for courtroom atmospheric sound effects.
- * No external assets required, low latency, fully responsive.
+ * Courtroom atmospheric sound effects with real MP3 audio asset support
+ * and Web Audio API synthesizer fallback.
  */
+
+const GAVEL_AUDIO_URL = 'https://sedatoseda.com/wp-content/uploads/gavel-of-justice-124029.mp3';
 
 class SoundController {
   private ctx: AudioContext | null = null;
   private soundEnabled: boolean = true;
+  private gavelAudio: HTMLAudioElement | null = null;
 
   constructor() {
-    // AudioContext will be initialized on first user interaction
+    if (typeof window !== 'undefined') {
+      try {
+        this.gavelAudio = new Audio(GAVEL_AUDIO_URL);
+        this.gavelAudio.preload = 'auto';
+      } catch (e) {
+        console.warn('Could not initialize gavel audio element', e);
+      }
+    }
   }
 
   private initContext() {
@@ -32,10 +42,32 @@ class SoundController {
   }
 
   /**
-   * Triple strike of the Judge's wooden gavel (چکش دادگاه)
+   * Judge's wooden gavel strike (چکش دادگاه)
+   * Plays the official audio file and falls back to Web Audio API synthesis if needed.
    */
   public playGavel() {
     if (!this.soundEnabled) return;
+
+    if (this.gavelAudio) {
+      try {
+        this.gavelAudio.currentTime = 0;
+        const playPromise = this.gavelAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            this.playSynthesizedGavel();
+          });
+          return;
+        }
+      } catch {
+        this.playSynthesizedGavel();
+        return;
+      }
+    }
+
+    this.playSynthesizedGavel();
+  }
+
+  private playSynthesizedGavel() {
     this.initContext();
     if (!this.ctx) return;
 

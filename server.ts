@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { PRESET_CASES } from './src/data/presets.ts';
 import { CaseDossier, Character, EvidenceItem } from './src/types.ts';
 
@@ -13,21 +13,24 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Model selection strictly prioritizing gemini-3.5-flash-lite for testing
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+// Model selection strictly prioritizing modern Gemini flash models (3.8, 3.7, 3.6, 3.5, 3.1-flash-lite)
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const FALLBACK_MODELS = Array.from(
   new Set([
     PRIMARY_MODEL,
-    'gemini-3.5-flash-lite',
     'gemini-3.8-flash',
     'gemini-3.7-flash',
     'gemini-3.6-flash',
     'gemini-3.5-flash',
-    'models/gemini-3.5-flash-lite',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-latest',
     'models/gemini-3.8-flash',
     'models/gemini-3.7-flash',
     'models/gemini-3.6-flash',
     'models/gemini-3.5-flash',
+    'models/gemini-3.5-flash-lite',
+    'models/gemini-3.1-flash-lite',
   ])
 );
 
@@ -69,7 +72,14 @@ function parseJsonFromAi<T>(rawText: string): T {
 }
 
 // 1. Initialize Gemini AI Client
-const apiKey = process.env.MY_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || '';
+const apiKey =
+  process.env.GEMINI_API_KEY ||
+  process.env.MY_GEMINI_API_KEY ||
+  process.env.GOOGLE_API_KEY ||
+  process.env.API_KEY ||
+  process.env.GOOGLE_GENAI_API_KEY ||
+  process.env.VITE_GEMINI_API_KEY ||
+  '';
 const customBaseUrl = process.env.GEMINI_BASE_URL || process.env.GOOGLE_GENAI_BASE_URL || '';
 
 let ai: GoogleGenAI | null = null;
@@ -96,7 +106,7 @@ if (apiKey) {
   addSystemLog('warn', 'GeminiClient', 'کلید GEMINI_API_KEY در متغیرهای محیطی یافت نشد! حالت آفلاین سناریونویس فعال شد.');
 }
 
-// Helper to generate content with automatic model fallback & 429 quota backoff
+// Helper to generate content with automatic model fallback & 503/429 instant rollover
 async function generateAiContent(prompt: string, isJsonMode = false, temperature = 0.85, maxOutputTokens?: number) {
   if (!ai) {
     addSystemLog('error', 'GeminiAPI', 'تلاش برای تولید محتوا در حالی که کلاینت هوش مصنوعی فعال نیست (بدون کلید API)');
@@ -106,7 +116,7 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
   let lastError: any = null;
   const triedModels = new Set<string>();
 
-  addSystemLog('info', 'GeminiAPI', `شروع فراخوانی تولید محتوا با ${FALLBACK_MODELS.length} کاندید مدل`);
+  addSystemLog('info', 'GeminiAPI', `شروع فراخوانی تولید محتوا با اولویت مدل‌های فلش (${FALLBACK_MODELS.slice(0, 4).join(', ')})`);
 
   for (const modelCandidate of FALLBACK_MODELS) {
     if (triedModels.has(modelCandidate)) continue;
@@ -123,6 +133,7 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
             ...(isJsonMode ? { responseMimeType: 'application/json' } : {}),
             temperature,
             ...(maxOutputTokens ? { maxOutputTokens } : {}),
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
           },
         });
 
@@ -136,12 +147,16 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
       } catch (err: any) {
         const errMsg = err?.message || String(err);
         const status = err?.status || err?.statusCode || 'UnknownStatus';
+        const is503 = status === 503 || errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('high demand');
         const is429 = status === 429 || errMsg.includes('429') || errMsg.includes('Quota') || errMsg.includes('RESOURCE_EXHAUSTED');
         
         addSystemLog('warn', 'GeminiAPI', `خطا در مدل [${modelCandidate}] (تلاش ${attempt}) - کد وضعیت: ${status} | پیام: ${errMsg}`, err);
         lastError = err;
 
-        if (is429 && attempt === 1) {
+        if (is503) {
+          addSystemLog('info', 'GeminiAPI', `مدل [${modelCandidate}] موقتاً با بار ترافیکی گوگل مواجه شد (503). سوییچ آنی به مدل فلش بعدی در صف...`);
+          break; // Immediately move to next candidate model without stalling
+        } else if (is429 && attempt === 1) {
           addSystemLog('info', 'GeminiAPI', 'پاسخ 429 (سقف تعداد درخواست) دریافت شد. ایجاد تاخیر ۱ ثانیه‌ای قبل از تلاش مجدد...');
           await new Promise((r) => setTimeout(r, 1000));
         } else {
@@ -750,7 +765,7 @@ async function startServer() {
   }
 }`;
 
-      const resAi = await generateAiContent(prompt, true, 0.85, 4000);
+      const resAi = await generateAiContent(prompt, true, 0.85, 2500);
       const parsedCase = parseJsonFromAi<CaseDossier>(resAi.text);
       res.json(parsedCase);
     } catch (error) {
@@ -791,8 +806,8 @@ ${caseData.title} | ${caseData.briefing}
 
 آخرین صحبت رد و بدل شده در دادگاه: "${lastExchange || 'صحبت‌های قبلی اتهام‌زنی شرکا به هم'}"
 
-یک مرافعه لفظی و دعوای داغ بین ۲ الی ۳ نفر از متهمان یا شاکیان (ترجیحاً کسانی که با هم تضاد منافع دارند، مثل متهم ردیف اول و شاهد کلیدی یا شاکی) بنویسید.
-لحن باید بسیار پرخاشگر، عصبی، تند و طبیعی باشد (شامل تهمت زدن به هم، پریدن وسط حرف یکدیگر، قسم خوردن و تپق زدن به خاطر عصبانیت).
+یک مرافعه لفظی، جدال حقوقی و دعوای داغ بین ۲ الی ۳ نفر از اشخاص حاضر در دادگاه (ترجیحاً افراد با تضاد منافع شدید مانند متهم و شاکی یا شرکای مشکوک) بنویسید.
+لحن باید بسیار جدی، پرخاشگر، تند، حقوقی و کاملاً منطبق بر جزئیات همین پرونده باشد. کاراکترها باید ادعاهای یکدیگر را زیر سوال ببرند و مدارک یا رفتارهای مشکوک هم را افشا کنند (بدون دیالوگ‌های کودکانه یا بی‌ربط).
 
 خروجی دقیقاً یک آرایه JSON با ساختار زیر باشد (هیچ متن دیگری ارسال نکنید):
 [
@@ -808,11 +823,11 @@ ${caseData.title} | ${caseData.briefing}
     } catch (error) {
       console.error('Error generating heated argument:', error);
       const c1 = caseData?.characters?.[0] || { name: 'متهم اول' };
-      const c2 = caseData?.characters?.[1] || { name: 'متهم دوم' };
+      const c2 = caseData?.characters?.[1] || { name: 'شاکی پرونده' };
       res.json({
         argument: [
-          { senderName: c1.name, text: 'جناب قاضی، او سعی دارد تقصیر را گردن من بیندازد در حالی که خودش مسئول اصلی بود!' },
-          { senderName: c2.name, text: 'دروغ نگو! تو خودت آن شب با مقتول ملاقات خصوصی داشتی!' }
+          { senderName: c1.name, text: `جناب قاضی، این ادعاها درباره پرونده «${caseData?.title || 'جاری'}» کذب محض است و او سعی در فریب دادگاه دارد!` },
+          { senderName: c2.name, text: `دروغ نگو! اسناد و شواهد موجود در پرونده همه چیز را اثبات می‌کند!` }
         ]
       });
     }
@@ -857,51 +872,59 @@ ${caseData.title} | ${caseData.briefing}
         .map((c: Character) => `ID: "${c.id}" | نام کامل: "${c.name}" | سمت: "${c.roleTitle}" | سن: ${c.age} | شغل: "${c.occupation}" | رابطه با قربانی: "${c.relationToVictim}" | روحیات: "${c.personality}" | وضعیت اخلاقی: "${c.temperament || 'normal'}" | استراتژی فریب: "${c.deceptionStrategy || 'ندارد'}" | نقاط ضعف: "${(c.vulnerabilities || []).join(', ')}"`)
         .join('\n\n');
 
-      const prompt = `شما کارگردان و هوش مصنوعی هماهنگ‌کننده کل سالن دادگاه جنایی بازی «آقای قاضی» هستید.
-قاضی (کاربر) در یک چت گروهی، سوال یا مدرکی را مطرح کرده است. شما باید تشخیص دهید قاضی با چه کسی سخن می‌گوید، دیالوگ او را شبیه‌سازی کنید و خروجی را ارسال کنید.
+      const prompt = `شما کارگردان و هوش مصنوعی هماهنگ‌کننده کل سالن دادگاه تخصصی بازی «آقای قاضی» هستید.
+قاضی (کاربر) در صحن علنی دادگاه، سوال یا مدرکی را مطرح کرده است. شما باید شخصیت مخاطب را تشخیص دهید و دیالوگی فوق‌العاده باهوش، واقع‌گرایانه، طبیعی و دقیقاً منطبق با موضوع پرونده برای او خلق کنید.
 
-لیست تمامی اشخاص حاضر در صحن دادگاه (متهمین، شاکیان، شهود، کارشناسان، شاکی):
+لیست تمامی اشخاص حاضر در صحن دادگاه (متهمین، شاکیان، شهود، کارشناسان):
 ${allCharsDescription}
 
-خلاصه پرونده جنایی:
+خلاصه پرونده و موضوع دادرسی:
 ${caseData.briefing}
 حقیقت پنهان واقعی پشت پرده:
 ${caseData.hiddenTruth?.howCrimeHappened || ''}
 تناقض کلیدی پرونده: ${caseData.hiddenTruth?.keyContradiction || ''}
 
-سابقه جریان دادگاه زنده (همه حرف‌های قبلی همه اشخاص):
+سابقه جریان دادگاه زنده (همه حرف‌های قبلی):
 ${historyStr}
 
 سوال یا مواجهه جدید قاضی:
 "${question}"
-${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگاه آن را می‌بینند:\nعنوان مدرک: ${evidence.title}\nشرح مدرک: ${evidence.description}\nمحل کشف: ${evidence.foundAt}\nگزارش آزمایشگاه: ${evidence.labReport}` : 'هیچ مدرک فیزیکی ضمیمه نشده است.'}
+${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگاه آن را می‌بینند:\nعنوان مدرک: ${evidence.title}\nشرح مدرک: ${evidence.description}\nمحل کشف: ${evidence.foundAt}\nگزارش کارشناسی: ${evidence.labReport}` : 'هیچ مدرک فیزیکی ضمیمه نشده است.'}
 
-دستورالعمل‌های بسیار مهم و حیاتی هدایت گروهی:
-۱. **تشخیص هوشمند آدرس مخاطب**: متن سوال قاضی را بررسی کنید و بفهمید روی سخن او دقیقاً با کدام یک از اشخاص حاضر در دادگاه است.
-   - او ممکن است نام اول، فامیل، یا سمت شخص (مثلاً "آقای حسابدار"، "پزشک قانونی"، "کامران") را بیاورد.
-   - **اشتباهات تایپی و تلفظی**: قاضی ممکن است اسم‌ها را با اشتباه تایپی یا مخفف بگوید (مثلاً بنویسد "کمران" به جای "کامران"، یا "مهین" به جای "مهین‌بانو"). نزدیک‌ترین شخصیت را شناسایی کنید.
-   - **واکنش به اشتباه تایپی**: اگر قاضی اسم را با اشتباه تایپی یا به صورت عامیانه صدا زد، شخصیت باید حتماً در ابتدای پاسخ خود با لحنی زنده و دراماتیک به این موضوع اشاره کند (مثال: «جناب قاضی، گمان می‌کنم منظورتان من (کامران) بودم... بله بفرمایید...» یا «اگر با من (مهین‌بانو) هستید قاضی محترم...»).
-   - **اگر مخاطبی مشخص نبود**: اگر سوال کاملاً عمومی است و اسم کسی برده نشده، فعال‌ترین متهم یا متهم اصلی پرونده را به عنوان پاسخ‌دهنده اول انتخاب کنید.
+قوانین و استانداردهای طلایی رفتار و دیالوگ کاراکترها (بسیار مهم):
+۱. **هوشمندی بالا و پرهیز از سوتی‌های بچه‌گانه (High Intelligence & Realistic Defense)**:
+   - کاراکترها انسان‌های بالغ، زیرک، محتاط و زبان‌باز هستند. تحت هیچ شرایطی سوتی‌های مضحک، اعتراف‌های پیش‌پاافتاده یا کودکانه نمی‌دهند.
+   - متهمین دروغ‌های باورپذیر می‌بافند، توجیه منطقی برای اعمال خود می‌آورند و تقصیر را هوشمندانه گردن دیگران یا شرایط می‌اندازند.
 
-۲. **آگاهی جمعی**: شخصیت انتخاب شده کاملاً از تمام سوال‌ها و دروغ‌هایی که دیگران تا این لحظه در "سابقه جریان دادگاه زنده" گفته‌اند باخبر است و باید در دفاع از خود فعالانه به آنها ارجاع دهد!
+۲. **سوتی‌های بسیار نادر، محدود و فوق‌العاده ظریف (Subtle & Rare Slip-Ups)**:
+   - در ۸۵٪ تا ۹۰٪ مکالمات عادی، مقدار فیلد "slipUp" باید دقیقاً **null** باشد.
+   - شخصیت فقط و فقط زمانی دچار تپق یا تناقض ظریف می‌شود که قاضی یک «مدرک قطعی و انکارناپذیر» را مستقیماً در برابرش قرار دهد یا او را در یک بن‌بست زمانی/منطقی شدید گیر بیندازد.
+   - حتی در زمان تناقض، سوتی باید خیلی ریز و واقع‌بینانه باشد (مثلاً یک تناقض کوچک در ساعت حضور، لو رفتن غیرعمدی یک جزئیات کوچک که ادعا می‌کرد از آن بی‌خبر است) نه اعتراف صریح.
 
-۳. **مداخله و قطع کلام خودکار (interruption)**: بررسی کنید آیا بر اثر پاسخ این شخصیت، یا به علت اتهام مستقیم قاضی، شخصیت عصبی یا شاکی دیگری در سالن از جایش بلند شده و با پرخاشگری وسط حرف او می‌پرد؟
-   - اگر بله، بخش "interruption" را پر کنید تا مرافعه شروع شود. در غیر این صورت آن را null بگذارید.
+۳. **تطابق ۱۰۰٪ با موضوع و مدارک پرونده**:
+   - تمامی صحبت‌ها، دفاعیات و ارجاعات باید دقیقاً بر اساس حقایق همین پرونده («${caseData.title}») باشد (مثلاً ارقام چک‌ها، قراردادها، امضاها، مبالغ، ساعات، نسبت‌ها یا گزارش‌های کارشناسی).
 
-خروجی صرفاً یک JSON معتبر فارسی باشد با ساختار زیر (هیچ کلمه اضافی قبل یا بعد ارسال نکنید):
+۴. **تشخیص دقیق مخاطب و اشتباهات تایپی**:
+   - نام یا سمت مخاطب قاضی را هوشمندانه تشخیص دهید.
+   - اگر قاضی اسم را با غلط املایی یا خلاصه گفت، کاراکتر با لحنی طبیعی و مودبانه/رندانه به تصحیح اسم اشاره کند (مثلاً «جناب قاضی، اگر با بنده (سهراب) هستید...»).
+
+۵. **مداخله و قطع کلام خودکار (interruption)**:
+   - فقط در ۲۰٪ مواقع بسیار حساس یا هنگام تنش بالا شیء interruption را پر کنید؛ در غیر این صورت مقدار آن را null بگذارید.
+
+خروجی صرفاً یک JSON معتبر فارسی باشد با ساختار زیر (بدون هیچ متن اضافی):
 {
-  "addressedCharacterId": "آیدی دقیق کاراکتر پاسخ‌دهنده (مثلاً char-kamran)",
+  "addressedCharacterId": "آیدی دقیق کاراکتر پاسخ‌دهنده",
   "addressedCharacterName": "نام دقیق کاراکتر پاسخ‌دهنده",
-  "speech": "پاسخ مستقیم و دیالوگ کاراکتر پاسخ‌دهنده به زبان فارسی (با لحن متناسب با شخصیت، مزاج و تایید یا تصحیح اسم با لحن طبیعی)",
-  "innerThought": "فکر مخفیانه یا استرس درونی ذهن کاراکتر پاسخ‌دهنده",
-  "slipUp": "اگر متهم دچار تناقض یا سوتی کلامی شد شرح کوتاه آن، در غیر این صورت null",
+  "speech": "پاسخ رسا، هوشمندانه، مستدل و واقع‌گرایانه کاراکتر پاسخ‌دهنده",
+  "innerThought": "مونولوگ درونی، محاسبه‌گری یا استرس پنهان کاراکتر در مغز خود",
+  "slipUp": "فقط در صورتی که قاضی با مدرک قطعی او را گیر انداخت تناقض ریز را بنویسید، در غیر این صورت null",
   "stressDelta": 10,
-  "lawyerIntervention": "اگر وکیل مدافع این کاراکتر اعتراض قانونی دارد متن اعتراض او، در غیر این صورت null",
+  "lawyerIntervention": "متن اعتراض حقوقی وکیل مدافع در صورت لزوم، در غیر این صورت null",
   "interruption": {
-    "interrupterId": "آیدی کاراکتر معترض که وسط حرف پرید",
+    "interrupterId": "آیدی کاراکتر معترض",
     "interrupterName": "نام کاراکتر معترض",
-    "interrupterText": "دیالوگ عصبانی کاراکتر معترض که بدون اجازه وسط حرف می‌پرد",
-    "replyText": "پاسخ تند متقابل کاراکتر پاسخ‌دهنده اصلی به او"
+    "interrupterText": "دیالوگ تند و مرتبط با همین پرونده",
+    "replyText": "پاسخ تند متقابل کاراکتر پاسخ‌دهنده اصلی"
   }
 }`;
 

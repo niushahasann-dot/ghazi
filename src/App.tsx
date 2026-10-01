@@ -137,7 +137,7 @@ export default function App() {
         setIsDisputeActive(true);
         setIsDisputeLoading(false);
 
-        // Queue lines to be posted one-by-one every 3 seconds
+        // Queue lines to be posted one-by-one every 3.5 seconds for comfortable reading
         const timeouts: number[] = [];
         lines.forEach((line: any, index: number) => {
           const timeoutId = window.setTimeout(() => {
@@ -160,7 +160,7 @@ export default function App() {
               }
               return active;
             });
-          }, (index + 1) * 3200);
+          }, (index + 1) * 3500);
           timeouts.push(timeoutId);
         });
         setDisputeTimeoutIds(timeouts);
@@ -276,7 +276,7 @@ export default function App() {
 
       // If Gemini returned an organic autonomous interruption:
       if (data.interruption) {
-        // Trigger a dramatic sequence!
+        // Trigger a dramatic sequence with comfortable 3-3.5s reading pauses
         const tid1 = window.setTimeout(() => {
           soundManager.playObjection();
           const disputeMsg1: InterrogationMessage = {
@@ -288,7 +288,7 @@ export default function App() {
           };
           setCourtroomMessages((prev) => [...prev, disputeMsg1]);
 
-          // After another 1.8 seconds, the original character replies back in anger!
+          // After another 3.5 seconds, the original character replies back in defense
           const tid2 = window.setTimeout(() => {
             soundManager.playPaperRustle();
             const disputeMsg2: InterrogationMessage = {
@@ -301,42 +301,12 @@ export default function App() {
             };
             setCourtroomMessages((prev) => [...prev, disputeMsg2]);
 
-            // Turn on active heated dispute mode so they keep trading generic/procedural barbs!
-            setIsDisputeActive(true);
-            
-            // Queue generic angry back-and-forth lines to keep the argument alive until the gavel is hit!
-            const timeouts: number[] = [];
-            const genericAngryLines = [
-              { senderName: data.interruption.interrupterName, text: 'جناب قاضی، این آقا دارد کاملاً دروغ می‌گوید تا خودش را تبرئه کند!' },
-              { senderName: responderChar.name, text: 'خفه شو! تو خودت آن شب در عمارت بودی و کلید کتابخانه دست تو بود!' },
-              { senderName: data.interruption.interrupterName, text: 'تهمت نزن شیاد! سوابق بانکی و الایبی جعلی تو همه چیز را آشکار خواهد کرد!' },
-              { senderName: responderChar.name, text: 'سر جایت بنشین و بگذار حقیقت مشخص شود!' }
-            ];
-            genericAngryLines.forEach((line, index) => {
-              const tid = window.setTimeout(() => {
-                setIsDisputeActive((active) => {
-                  if (active) {
-                    soundManager.playObjection();
-                    const nextMsg: InterrogationMessage = {
-                      id: `dispute-auto-loop-${Date.now()}-${index}`,
-                      sender: index % 2 === 0 ? 'dispute_character' : 'character',
-                      senderName: line.senderName,
-                      text: line.text,
-                      timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
-                    };
-                    setCourtroomMessages((prev) => [...prev, nextMsg]);
-                  }
-                  return active;
-                });
-              }, (index + 1) * 3500);
-              timeouts.push(tid);
-            });
-            setDisputeTimeoutIds(timeouts);
-
-          }, 1800);
+            // End dispute state cleanly after the two dynamic in-character AI dialogue exchanges
+            setIsDisputeActive(false);
+          }, 3500);
           setDisputeTimeoutIds((prev) => [...prev, tid2]);
 
-        }, 1500);
+        }, 2800);
         setDisputeTimeoutIds((prev) => [...prev, tid1]);
       }
     } catch (err) {
