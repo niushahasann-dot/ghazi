@@ -13,8 +13,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Model selection strictly restricted to Gemini 3.x series
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Model selection strictly restricted to Gemini 3.x Flash series (3.8, 3.7, 3.6, 3.5) with optional models/ prefix
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const FALLBACK_MODELS = Array.from(
   new Set([
     PRIMARY_MODEL,
@@ -22,6 +22,10 @@ const FALLBACK_MODELS = Array.from(
     'gemini-3.7-flash',
     'gemini-3.6-flash',
     'gemini-3.5-flash',
+    'models/gemini-3.8-flash',
+    'models/gemini-3.7-flash',
+    'models/gemini-3.6-flash',
+    'models/gemini-3.5-flash',
   ])
 );
 
@@ -363,19 +367,19 @@ function generateProceduralCase(topic: string): CaseDossier {
   return {
     id: caseId,
     caseNumber: caseNum,
-    title: `جنایت تاریک و راز پنهان در عمارت نیاوران`,
-    genre: 'جنایی، معمایی و دادرسی دادگاهی',
+    title: `پرونده بحرانی درباره: ${cleanTopic}`,
+    genre: 'بررسی تخلف، دادرسی و حل معما',
     incidentDate: '۱۴۰۵/۰۷/۰۹ - ساعت ۲۱:۰۰ شب',
-    location: 'عمارت خصوصی و دفتر کار نیاوران',
-    victimName: 'مهندس کامران رستگار (۴۲ ساله - سرمایه‌گذار ارشد)',
-    victimBackground: `سرمایه‌گذار برجسته‌ای که به دنبال اختلافات مالی سنگین و افشای اسناد محرمانه به قتل رسید.`,
-    briefing: `گزارش آگاهی: ساعت ۲۱:۰۰ شب گذشته، جسد مهندس رستگار در اتاق کار شخصی‌اش کشف گردید. بررسی‌های جنایی نشان می‌دهد ۵ شخص مرتبط داستان‌های متناقضی درباره حضور خود بیان کرده‌اند که باید در صحن دادگاه بازجویی شوند.`,
+    location: 'محل وقوع اختلافات مربوط به پرونده',
+    victimName: 'جناب آقای کامران رستگار (شاکی / متضرر پرونده)',
+    victimBackground: `شخص ذینفع و شاکی اصلی پرونده که تقاضای ممیزی رسمی و پیگرد قانونی موضوع «${cleanTopic}» را دارد.`,
+    briefing: `گزارش بازرسی شعبه ویژه دادگاه: تحقیقات اولیه پیرامون موضوع «${cleanTopic}» حاکی از وجود تخلفات جدی و اسناد متناقض مالی و اداری است. اشخاص مرتبط هر کدام ادعاهای متناقضی را در محضر دادگاه مطرح نموده‌اند که نیازمند بازجویی و مداقه جنایی قاضی است.`,
     autopsyReport: {
       timeOfDeath: 'ساعت ۲۰:۳۰ الی ۲۱:۰۰ شب',
-      causeOfDeath: 'انسداد مجاری تنفسی و مسمومیت ترکیبی',
-      toxicology: 'مثبت - وجود ماده شیمیایی شتاب‌دهنده در خون',
-      injuries: ['آثار کبودی روی مچ دست', 'ضربه به گیجگاه راست'],
-      coronerNotes: 'جرم با برنامه‌ریزی قبلی و توسط فردی با دسترسی مستقیم انجام شده است.',
+      causeOfDeath: `ریشه اختلاف پیرامون موضوع: ${cleanTopic}`,
+      toxicology: 'مثبت - وجود تخلف ساختاری و جعل اسناد اداری',
+      injuries: ['فاکتورهای مالی مورد مناقشه', 'اسناد پلاک ثبتی یا شهادت شهود'],
+      coronerNotes: 'بررسی کارشناسی حاکی از تعمد کامل متهم اصلی در ارتکاب تخلف و دروغگویی سیستماتیک است.',
     },
     evidence: [
       {
