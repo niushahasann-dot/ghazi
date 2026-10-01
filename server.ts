@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
@@ -12,17 +13,30 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = apiKey
-  ? new GoogleGenAI({
+// 1. Initialize Gemini AI Client (Railway Proxy / Bridge Setup)
+// Supports GEMINI_API_KEY, GOOGLE_API_KEY, and optional custom reverse proxy endpoint (GEMINI_BASE_URL)
+const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || '';
+const customBaseUrl = process.env.GEMINI_BASE_URL || process.env.GOOGLE_GENAI_BASE_URL || '';
+
+let ai: GoogleGenAI | null = null;
+if (apiKey) {
+  try {
+    ai = new GoogleGenAI({
       apiKey,
+      ...(customBaseUrl ? { baseUrl: customBaseUrl } : {}),
       httpOptions: {
         headers: {
-          'User-Agent': 'aistudio-build',
+          'User-Agent': 'aistudio-build-judge-app',
         },
       },
-    })
-  : null;
+    });
+    console.log('[پل جمینای] ارتباط با سرویس هوش مصنوعی جمینای فعال گردید.');
+  } catch (err) {
+    console.error('[پل جمینای] خطا در راه‌اندازی کلاینت هوش مصنوعی:', err);
+  }
+} else {
+  console.warn('[پل جمینای] کلید GEMINI_API_KEY در متغیرهای محیطی یافت نشد. شبیه‌ساز آفلاین فعال است.');
+}
 
 async function startServer() {
   const app = express();
@@ -30,7 +44,58 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
-  // API Routes
+  // ==========================================
+  // STATIC ASSETS & IMAGE DELIVERY (Railway Fix)
+  // Ensures images are served with proper headers without text/html 404 fallback
+  // ==========================================
+  const serveImageHandler = (req: Request, res: Response, next: express.NextFunction) => {
+    const ext = path.extname(req.path).toLowerCase();
+    if (!['.jpg', '.jpeg', '.png', '.webp', '.svg', '.ico'].includes(ext)) {
+      return next();
+    }
+    const filename = path.basename(req.path);
+    const candidatePaths = [
+      path.resolve(__dirname, 'public/images', filename),
+      path.resolve(__dirname, 'public', filename),
+      path.resolve(__dirname, 'dist/images', filename),
+      path.resolve(__dirname, 'dist', filename),
+      path.resolve(__dirname, 'src/assets/images', filename),
+    ];
+
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        res.setHeader('Content-Type', ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.sendFile(p);
+      }
+    }
+    next();
+  };
+
+  app.use(serveImageHandler);
+  app.use('/images', express.static(path.resolve(__dirname, 'public/images')));
+  app.use('/src/assets/images', express.static(path.resolve(__dirname, 'src/assets/images')));
+  app.use(express.static(path.resolve(__dirname, 'public')));
+  if (fs.existsSync(path.resolve(__dirname, 'dist'))) {
+    app.use(express.static(path.resolve(__dirname, 'dist')));
+  }
+
+  // ==========================================
+  // GEMINI BRIDGE & API ROUTES
+  // ==========================================
+
+  // 0. Bridge Status (Check if user has active Gemini bridge on Railway)
+  app.get('/api/bridge-status', (_req: Request, res: Response) => {
+    res.json({
+      active: !!ai,
+      bridge: 'Railway Europe/Global Gateway',
+      model: 'gemini-3.8-flash',
+      noVpnNeeded: true,
+      message: ai
+        ? 'پل ارتباطی جمینای در سرور فعال و آماده است.'
+        : 'سرور در حالت شبیه‌ساز آفلاین است. متغیر GEMINI_API_KEY را در پنل ریلوی وارد کنید.',
+    });
+  });
 
   // 1. Get Preset Cases
   app.get('/api/preset-cases', (_req: Request, res: Response) => {
@@ -44,7 +109,9 @@ async function startServer() {
     if (!ai) {
       // High-quality offline fallback simulation
       const msgCount = (messages || []).length;
-      const isReady = msgCount >= 3 || userPrompt.includes('بساز') || userPrompt.includes('موافق') || userPrompt.includes('نهایی');
+      const isReady =
+        msgCount >= 2 ||
+        (userPrompt && (userPrompt.includes('بساز') || userPrompt.includes('موافق') || userPrompt.includes('نهایی')));
       return res.json({
         reply: isReady
           ? `جناب قاضی، به نتیجه و توافق نهایی بر سر کلیات این پرونده رسیدیم! ماجرای جنایت، ترفند فریبکارانه متهم برای انکار جرم و تناقض پزشکی قانونی کاملاً مشخص گردید. هم‌اکنون می‌توانید دکمه «تایید نهایی و تشکیل رسمی پرونده» را بزنید تا دادگاه تشکیل شود.`
@@ -74,10 +141,10 @@ async function startServer() {
       });
 
       const responseText = response.text || '';
-      const isReadyToBuild = responseText.includes('[READY_TO_BUILD]') || 
-        userPrompt.includes('بساز') || 
-        userPrompt.includes('نهایی کن') || 
-        userPrompt.includes('موافقم');
+      const isReadyToBuild =
+        responseText.includes('[READY_TO_BUILD]') ||
+        (userPrompt &&
+          (userPrompt.includes('بساز') || userPrompt.includes('نهایی کن') || userPrompt.includes('موافقم')));
 
       const cleanReply = responseText.replace('[READY_TO_BUILD]', '').trim();
 
@@ -99,7 +166,6 @@ async function startServer() {
     const { customIdea, consultationSummary, consultationThread, genre } = req.body;
 
     if (!ai) {
-      // Return a dynamic variant of preset
       const template = PRESET_CASES[Math.floor(Math.random() * PRESET_CASES.length)];
       const customCase: CaseDossier = {
         ...template,
@@ -154,7 +220,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
     {
       "id": "ev-1",
       "title": "نام مدرک",
-      "type": "physical", // یا forensic یا document یا digital
+      "type": "physical",
       "description": "شرح مدرک",
       "foundAt": "محل کشف مدرک",
       "significance": "اهمیت مدرک در اثبات یا رد ادعاها",
@@ -165,7 +231,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
     {
       "id": "char-1",
       "name": "نام شخص",
-      "role": "defendant", // یا plaintiff یا defense_lawyer یا expert یا witness
+      "role": "defendant",
       "roleTitle": "سمت در دادگاه (مثلا متهم ردیف اول)",
       "age": 35,
       "occupation": "شغل",
@@ -201,115 +267,89 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
       res.json(parsedCase);
     } catch (error) {
       console.error('Error generating case:', error);
-      // Fallback to random preset with custom title
       const template = PRESET_CASES[0];
       res.json({
         ...template,
-        id: `case-fallback-${Date.now()}`,
+        id: `case-custom-${Date.now()}`,
         title: customIdea ? `پرونده: ${customIdea.slice(0, 30)}` : template.title,
       });
     }
   });
 
-  // 4. Interrogate summoned person in courtroom
+  // 4. Live Interrogation of Summoned Person in Courtroom
   app.post('/api/interrogate', async (req: Request, res: Response) => {
     const { caseData, characterId, question, evidencePresentedId, history } = req.body;
 
-    const character: Character | undefined = caseData?.characters?.find((c: Character) => c.id === characterId);
-
-    if (!character) {
-      return res.status(404).json({ error: 'شخص مورد نظر در دادگاه یافت نشد.' });
+    const char = (caseData?.characters || []).find((c: Character) => c.id === characterId);
+    if (!char) {
+      return res.status(404).json({ error: 'شخص مورد نظر در دادگاه یافت نشد' });
     }
 
-    const presentedEvidence = evidencePresentedId
-      ? caseData.evidence?.find((e: { id: string }) => e.id === evidencePresentedId)
+    const evidence = evidencePresentedId
+      ? (caseData?.evidence || []).find((e: { id: string }) => e.id === evidencePresentedId)
       : null;
 
     if (!ai) {
-      // Dynamic local simulation
-      let speech = '';
-      let innerThought = '';
-      let stressDelta = 5;
-      let lawyerIntervention: string | null = null;
-      let slipUp: string | null = null;
-
-      if (character.role === 'defendant') {
-        if (presentedEvidence) {
-          speech = `جناب قاضی! درباره «${presentedEvidence.title}»... این نمی‌تواند مدرک محکمی باشد! کسی سعی کرده آن را آنجا بگذارد تا مرا مقصر جلوه دهد! من در آن ساعت اصلاً نزدیک آنجا نبودم!`;
-          innerThought = 'رنگ از چهره‌اش پرید و دستانش را با اضطراب در جیبش پنهان کرد.';
-          stressDelta = 20;
-          lawyerIntervention = 'جناب قاضی، اعتراض دارم! ارائه مدارک به این شکل بدون ابلاغ رسمی قبلی موجب فشار روانی بر موکل من است.';
-          slipUp = 'به طور ناخواسته اشاره کرد که وسیله در گوشه سمت راست بوده در حالی که در گزارش مکان دقیق ذکر نشده بود!';
-        } else {
-          speech = `آقای قاضی، من با کمال احترام حقیقت را گفتم. من هیچ نفعی از مرگ او نمی‌بردم و وجدانم کاملاً آسوده است. هر سؤالی دارید پاسخ می‌دهم.`;
-          innerThought = 'با اعتماد به نفس تصنعی به چشم‌های قاضی خیره شد.';
-          stressDelta = 2;
-        }
-      } else if (character.role === 'defense_lawyer') {
-        speech = `جناب قاضی، اظهارات دادسرا صرفاً مبتنی بر حدسیات و قرائن ضعیف است. موکل من حق دارد بر اساس اصل برائت از هرگونه اتهام واهی مبرا شناخته شود.`;
-        innerThought = 'پرونده را با جدیت ورق زد و عینکش را جابجا کرد.';
-      } else if (character.role === 'expert') {
-        speech = `طبق آزمایش‌های بیوشیمیایی و داده‌های فیزیکی، گزارش صحنه جرم کاملاً قطعی است. شواهد علمی هیچ جای شکی برای وقوع این رویداد با مشخصات قید شده باقی نمی‌گذارد.`;
-        innerThought = 'با طمأنینه و نگاه به نتایج آزمایشگاهی پاسخ داد.';
-      } else {
-        speech = `جناب قاضی، من چیزی جز حقیقت نمی‌دانم. آن شب شرایط بسیار غیرعادی بود و من حاضر به ادای سوگند در محضر دادگاه هستم.`;
-        innerThought = 'با صدایی آرام و نگران سخن گفت.';
-      }
-
+      // High fidelity offline reply
+      const isDef = char.role === 'defendant';
       return res.json({
-        speech,
-        innerThought,
-        lawyerIntervention,
-        stressDelta,
-        slipUp,
+        speech: isDef
+          ? `جناب قاضی، بنده بارها عرض کرده‌ام که در آن لحظه شوم فرسنگ‌ها از آنجا دور بودم! این اتهامات ساخته و پرداخته دشمنان من است.`
+          : `ریاست محترم دادگاه، آنچه دیدم و شنیدم را صادقانه در محضر عدالت بیان کردم.`,
+        innerThought: isDef ? 'باید خونسرد بمانم و اجازه ندهم متوجه تناقض زمان‌بندی بشوند...' : undefined,
+        slipUp: evidence ? `تناقض در خصوص مکان کشف ${evidence.title}` : undefined,
+        stressDelta: evidence ? 15 : 5,
       });
     }
 
     try {
-      const historyContext = (history || [])
-        .slice(-6)
+      const historyStr = (history || [])
         .map((h: { sender: string; text: string }) => `${h.sender}: ${h.text}`)
         .join('\n');
 
-      const systemPrompt = `شما در حال نقش‌آفرینی زنده در دادگاه کیفری بازی «آقای قاضی» هستید.
-اطلاعات پرونده:
-عنوان: ${caseData.title}
-خلاصه: ${caseData.briefing}
-حقیقت پنهان (صرفاً برای اطلاع بازیگر و نه افشای مستقیم به قاضی):
-مقصر واقعی: ${caseData.hiddenTruth.realCulpritName}
-چگونگی وقوع: ${caseData.hiddenTruth.howCrimeHappened}
-تناقض کلیدی: ${caseData.hiddenTruth.keyContradiction}
+      const isDefendant = char.role === 'defendant';
+      const isWitness = char.role === 'witness';
+      const isExpert = char.role === 'expert';
 
-شخصیتی که باید نقش او را بازی کنید:
-نام: ${character.name}
-نقش: ${character.roleTitle} (${character.role})
-سن: ${character.age}
-روانشناسی: ${character.personality}
-آیا دروغگو و مقصر است؟: ${character.isLying ? 'بله، مقصر است و سعی در فریب قاضی دارد' : 'خیر، حقیقت را می‌گوید یا از واقعیت مطلع است'}
-استراتژی فریب: ${character.deceptionStrategy || 'ندارد'}
-نقاط ضعف: ${(character.vulnerabilities || []).join('، ')}
+      const prompt = `شما در حال نقش‌آفرینی زنده در صحن دادگاه جنایی بازی «آقای قاضی» هستید.
+نام شخصیتی که باید نقشش را بازی کنید: ${char.name}
+نقش در دادگاه: ${char.roleTitle} (${char.role})
+سن: ${char.age} سال | شغل: ${char.occupation}
+روابط با قربانی: ${char.relationToVictim}
+روحیات و شخصیت: ${char.personality}
+استراتژی دروغ و فریب متهم: ${char.deceptionStrategy || 'ندارد'}
+نقاط ضعف و تناقضات متهم: ${(char.vulnerabilities || []).join(', ')}
 
-شرایط فعلی دادگاه:
-مدرک ارائه شده توسط قاضی در این لحظه: ${presentedEvidence ? `${presentedEvidence.title} (${presentedEvidence.description} - اهمیت: ${presentedEvidence.significance} - آزمایشگاه: ${presentedEvidence.labReport})` : 'مدرک خاصی ارائه نشده است.'}
+خلاصه پرونده:
+${caseData.briefing}
+حقیقت پنهان واقعی پشت پرده:
+${caseData.hiddenTruth.howCrimeHappened}
+تناقض کلیدی پرونده: ${caseData.hiddenTruth.keyContradiction}
 
-دستورالعمل رفتاری:
-- اگر نقش متهم را بازی می‌کنید: به شدت برای حفظ بی‌گناهی خود بجنگید، دستپاچه شوید اگر مدرک دندان‌شکنی ارائه شد، تناقض بگویید یا تهمت را به دیگری بزنید. اگر مدرک بسیار قوی است، دچار لکنت، دستپاچگی یا لغزش کلامی (slipUp) شوید!
-- اگر وکیل مدافع هستید: اعتراضات حقوقی به جا یا تذکر به قاضی و حمایت از موکل داشته باشید.
-- اگر متخصص یا شاهد هستید: بی‌طرف، مستند یا بر اساس مشاهدات واقعی صحبت کنید.
-- خروجی صرفاً یک JSON معتبر باشد با ساختار زیر:
+سابقه سوال و جواب‌های قبلی در دادگاه:
+${historyStr}
+
+سوال یا مواجهه فعلی قاضی:
+"${question}"
+${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آن مواجه شده است:\nعنوان مدرک: ${evidence.title}\nشرح مدرک: ${evidence.description}\nمحل کشف: ${evidence.foundAt}\nگزارش آزمایشگاه: ${evidence.labReport}` : 'هیچ مدرک فیزیکی ارائه نشده است.'}
+
+دستورالعمل ایفای نقش:
+۱. کاملاً در قالب این کاراکتر با لحن و احساسات واقعی صحبت کنید (ترس، انکار، لکنت، غرور، دفاع حقوقی یا پرخاشگری).
+۲. اگر متهم هستید، بر اساس استراتژی فریبکاری خود دروغ بگویید یا انکار کنید. اما اگر قاضی مدرکی ارائه داد که با ادعای شما تناقض دارد، دچار تپش قلب و دستپاچگی شوید و شاید دچار لغزش زبانی کوچک (slipUp) شوید!
+۳. اگر وکیل مدافع نیاز به مداخله دید (اعتراض به نحوه سوال قاضی یا مدرک نامعتبر)، متن اعتراض وکیل را نیز پر کنید.
+
+خروجی صرفاً یک JSON معتبر باشد با ساختار زیر (بدون هیچ کلمه اضافی):
 {
-  "speech": "پاسخ زنده کاراکتر در دادگاه به فارسی",
-  "innerThought": "توصیف زبان بدن و حالت چهره مثلا: (عرق سرد روی شقیقه‌اش نشست و نگاهم را دزدید)",
-  "lawyerIntervention": "اگر وکیل مدافع نیاز به اعتراض فوری داشت متنش را بنویس وگرنه null",
-  "stressDelta": عدد بین -10 تا +30 بر اساس فشار سوال و مدرک,
-  "slipUp": "اگر کاراکتر سوتی داد یا ناخواسته حقیقتی را لو داد شرح بده وگرنه null"
+  "speech": "پاسخ مستقیم و دیالوگ کاراکتر در صحن دادگاه به زبان فارسی",
+  "innerThought": "فکر مخفیانه یا استرس درون ذهن کاراکتر (اختیاری)",
+  "slipUp": "اگر متهم دچار تناقض یا سوتی کلامی شد شرح کوتاه آن، در غیر این صورت null",
+  "stressDelta": 10, // تغییر میزان استرس متهم بین -10 تا +25
+  "lawyerIntervention": "اگر وکیل مدافع کاراکتر اعتراض قانونی دارد متن اعتراض او، در غیر این صورت null"
 }`;
-
-      const userMessage = `تاریخچه گفتگو با این شخص:\n${historyContext}\n\nسؤال جدید قاضی: ${question}\nمدرک ارائه‌شده: ${presentedEvidence ? presentedEvidence.title : 'هیچ'}`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.8-flash',
-        contents: `${systemPrompt}\n\n${userMessage}`,
+        contents: prompt,
         config: {
           responseMimeType: 'application/json',
           temperature: 0.8,
@@ -319,22 +359,19 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
       const parsed = JSON.parse(response.text || '{}');
       res.json(parsed);
     } catch (error) {
-      console.error('Error during interrogation:', error);
+      console.error('Error in interrogate API:', error);
       res.json({
-        speech: `جناب قاضی، من با نهایت احترام پاسخ دادم، اما ادعاهای مطرح شده نیاز به راستی‌آزمایی دارد.`,
-        innerThought: 'با نگاهی مشکوک سکوت کرد.',
-        stressDelta: 10,
-        lawyerIntervention: null,
-        slipUp: null,
+        speech: `جناب قاضی، در خصوص این مورد توضیح دیگری ندارم و خواهان بررسی مجدد اوراق پرونده هستم.`,
+        stressDelta: 5,
       });
     }
   });
 
-  // 5. Issue Verdict & Final Judgment Evaluation
+  // 5. Judge Final Verdict Evaluation
   app.post('/api/judge-verdict', async (req: Request, res: Response) => {
     const { caseData, accusedId, verdictType, verdictReasoning, penalty } = req.body;
 
-    const chosenPerson = caseData?.characters?.find((c: Character) => c.id === accusedId);
+    const chosenPerson = (caseData?.characters || []).find((c: Character) => c.id === accusedId);
     const realCulpritId = caseData?.hiddenTruth?.realCulpritId;
     const isDirectMatch = accusedId === realCulpritId;
 
@@ -342,21 +379,20 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
       const isCorrect = isDirectMatch && verdictType === 'guilty';
       return res.json({
         isCorrect,
-        justiceRating: isCorrect ? 94 : 45,
-        truthRevealed: caseData?.hiddenTruth?.howCrimeHappened || 'حقیقت پشت پرده آشکار شد.',
+        justiceRating: isCorrect ? 94 : 35,
+        truthRevealed: caseData?.hiddenTruth?.howCrimeHappened || 'پرونده مختومه شد.',
         feedback: isCorrect
-          ? 'آفرین جناب قاضی! شما فریب دروغ‌ها و الایبی متهم را نخوردید و عدالت به درستی اجرا شد.'
-          : 'متاسفانه متهم توانست شما را فریب دهد یا مدارک اصلی نادیده گرفته شد.',
+          ? 'آفرین جناب قاضی! شما موفق شدید مجرم واقعی را شناسایی و تناقض مدارک را برملا کنید.'
+          : 'حکم صادره متاسفانه با حقیقت ماجرا مغایرت داشت و فرد بی‌گناه مجازات گردید.',
         deceptionBusted: isCorrect,
-        epilogue: `دادگاه با انشای رأی شما به پایان رسید. پرونده کلاسه ${caseData?.caseNumber} مختومه گردید.`,
-        culpritConfession: isCorrect ? 'متهم با دیدن استدلال محکم قاضی در هم شکست و به تمامی ابعاد جنایت اعتراف کرد.' : undefined,
+        epilogue: 'پرونده با صدور دادنامه به اجرای احکام دادگستری ارسال شد.',
+        culpritConfession: isCorrect ? 'اعتراف می‌کنم... فکر نمی‌کردم متوجه آن تناقض شوید!' : undefined,
       });
     }
 
     try {
-      const evaluationPrompt = `شما دیوان عالی عدالت و ارزیاب قضایی بازی «آقای قاضی» هستید.
-اطلاعات پرونده:
-عنوان: ${caseData.title}
+      const evaluationPrompt = `شما هیئت عالی نظارت قضایی بر احکام دادگاه جنایی در بازی «آقای قاضی» هستید.
+پرونده: ${caseData.title}
 شرح واقعه: ${caseData.briefing}
 حقیقت پنهان واقعی:
 مجرم اصلی: ${caseData.hiddenTruth.realCulpritName} (آیدی: ${realCulpritId})
@@ -381,7 +417,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
   "justiceRating": 95,
   "truthRevealed": "شرح کامل و جذاب حقیقت واقعی پشت پرده جنایت",
   "feedback": "تحلیل عملکرد قاضی: نقاط قوت استدلال و مواردی که قاضی متوجه شد یا غفلت کرد",
-  "deceptionBusted": true/false (آیا ترفند فریبکارانه متهم خنثی شد؟),
+  "deceptionBusted": true/false,
   "epilogue": "سرنوشت پرونده، متهم و شاکی پس از اجرای این حکم",
   "culpritConfession": "جملات اعتراف یا واکنش نهایی مقصر در لحظه اعلام حکم"
 }`;
@@ -411,11 +447,21 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
     }
   });
 
-  // Serve Frontend
-  if (process.env.NODE_ENV === 'production') {
+  // ==========================================
+  // SPA SERVING (Production & Development)
+  // ==========================================
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    process.env.RAILWAY_ENVIRONMENT !== undefined ||
+    fs.existsSync(path.resolve(__dirname, 'dist/index.html'));
+
+  if (isProduction && fs.existsSync(path.resolve(__dirname, 'dist/index.html'))) {
     app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (_req: Request, res: Response) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+    app.get('*', (req: Request, res: Response) => {
+      if (req.path.startsWith('/api') || req.path.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|css|js|map)$/i)) {
+        return res.status(404).send('Asset not found');
+      }
+      res.sendFile(path.resolve(__dirname, 'dist/index.html'));
     });
   } else {
     const vite = await createViteServer({
@@ -426,7 +472,7 @@ ${consultationThread || consultationSummary || customIdea || 'یک قتل پیچ
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[آقای قاضی] Courtroom server running on http://0.0.0.0:${PORT}`);
+    console.log(`[آقای قاضی] پل هوشمند دادگاه و سرور روی پورت ${PORT} آماده پاسخگویی است.`);
   });
 }
 

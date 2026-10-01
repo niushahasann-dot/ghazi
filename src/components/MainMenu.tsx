@@ -58,7 +58,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         <div className="flex items-center gap-2.5">
           <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-amber-500/50 shadow-md shadow-amber-950/50 bg-[#12141f] shrink-0">
             <img
-              src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
+              src="/images/court_gavel_logo.jpg"
               alt="نشان رسمی دادگاه"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover scale-[1.15]"
@@ -102,7 +102,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           {/* Majestic Circular Emblem */}
           <div className="w-56 h-56 sm:w-72 sm:h-72 mx-auto rounded-full overflow-hidden border-4 border-amber-600/80 shadow-[0_0_50px_rgba(217,119,6,0.35)] bg-[#0d0e14] ring-8 ring-[#1c1f2e] group hover:border-amber-400 transition-all duration-300">
             <img
-              src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
+              src="/images/court_gavel_logo.jpg"
               alt="نشان رسمی دادگاه آقای قاضی"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover scale-[1.12] group-hover:scale-[1.16] transition-transform duration-700"

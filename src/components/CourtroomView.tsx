@@ -104,7 +104,7 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
       {/* Real Courtroom Background with Moody Dark Vignette */}
       <div
         className="fixed inset-0 bg-cover bg-center pointer-events-none -z-20 opacity-35 filter brightness-50 contrast-125"
-        style={{ backgroundImage: `url('/src/assets/images/courtroom_hall_bg_1790815076100.jpg')` }}
+        style={{ backgroundImage: `url('/images/courtroom_hall_bg.jpg')` }}
       />
       <div className="fixed inset-0 bg-gradient-to-t from-[#08090e] via-[#0b0d14]/90 to-[#08090e]/95 pointer-events-none -z-10" />
 
@@ -114,7 +114,7 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full overflow-hidden border border-amber-500/50 shadow-md shrink-0 bg-stone-900">
               <img
-                src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
+                src="/images/court_gavel_logo.jpg"
                 alt="لوگو دادگاه"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover scale-[1.15]"
