@@ -52,12 +52,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="h-6 w-px bg-stone-800 hidden sm:block" />
 
           {/* Court Logo Badge */}
-          <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/40 shadow-md shadow-amber-950/50 shrink-0 relative bg-stone-900">
+          <div className="w-9 h-9 rounded-full overflow-hidden border border-amber-500/50 shadow-md shadow-amber-950/50 shrink-0 relative bg-stone-900">
             <img
               src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
               alt="نشان رسمی دادگاه آقای قاضی"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover scale-[1.15]"
             />
           </div>
 

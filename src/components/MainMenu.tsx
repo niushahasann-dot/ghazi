@@ -56,12 +56,12 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       {/* Top Header Controls */}
       <header className="relative z-10 flex items-center justify-between max-w-6xl mx-auto w-full">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/40 shadow-md shadow-amber-950/50 bg-stone-900 shrink-0">
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-amber-500/50 shadow-md shadow-amber-950/50 bg-[#12141f] shrink-0">
             <img
               src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
               alt="نشان رسمی دادگاه"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover scale-[1.15]"
             />
           </div>
           <span className="text-xs md:text-sm font-semibold text-stone-300 tracking-wider">
@@ -94,18 +94,24 @@ export const MainMenu: React.FC<MainMenuProps> = ({
 
       {/* Hero Branding Section */}
       <div className="relative z-10 max-w-4xl mx-auto w-full text-center my-auto py-6 space-y-6">
-        {/* Judicial Crest Emblem (Hero Image Logo) */}
-        <div className="relative inline-block">
-          <div className="w-36 h-36 sm:w-44 sm:h-44 mx-auto rounded-3xl overflow-hidden border-2 border-amber-500/50 shadow-2xl shadow-amber-950/80 bg-stone-900 ring-4 ring-amber-500/20 group hover:border-amber-400 transition-all duration-300">
+        {/* Judicial Crest Emblem (Hero Image Logo - Grand Size without any white border) */}
+        <div className="relative inline-block my-2">
+          {/* Subtle Ambient Radial Glow */}
+          <div className="absolute inset-0 rounded-full bg-amber-600/20 blur-2xl -z-10 scale-110 pointer-events-none" />
+
+          {/* Majestic Circular Emblem */}
+          <div className="w-56 h-56 sm:w-72 sm:h-72 mx-auto rounded-full overflow-hidden border-4 border-amber-600/80 shadow-[0_0_50px_rgba(217,119,6,0.35)] bg-[#0d0e14] ring-8 ring-[#1c1f2e] group hover:border-amber-400 transition-all duration-300">
             <img
               src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
               alt="نشان رسمی دادگاه آقای قاضی"
               referrerPolicy="no-referrer"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover scale-[1.12] group-hover:scale-[1.16] transition-transform duration-700"
             />
           </div>
-          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-red-950/90 border border-red-500/60 text-red-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5 whitespace-nowrap">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+
+          {/* Badge beneath the circular seal */}
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-red-950 via-red-900 to-red-950 border border-red-500/70 text-red-200 text-xs font-bold px-4 py-1.5 rounded-full shadow-xl flex items-center gap-2 whitespace-nowrap">
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
             <span>نشان رسمی دادگاه جنایی</span>
           </div>
         </div>

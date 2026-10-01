@@ -8,13 +8,14 @@ import { CourtroomView } from './components/CourtroomView.tsx';
 import { VerdictModal } from './components/VerdictModal.tsx';
 import { ConsultationRoom } from './components/ConsultationRoom.tsx';
 import { MainMenu } from './components/MainMenu.tsx';
+import { Home, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function App() {
-  // App views: 'menu' (initial entry) or 'game' (inside active court session)
-  const [currentView, setCurrentView] = useState<'menu' | 'game'>('menu');
-  const [currentTab, setCurrentTab] = useState<'dossier' | 'court' | 'verdict' | 'consult'>('dossier');
+  // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session)
+  const [currentView, setCurrentView] = useState<'menu' | 'consult' | 'game'>('menu');
+  const [currentTab, setCurrentTab] = useState<'dossier' | 'court' | 'verdict' | 'consult'>('court');
 
-  // No case is loaded initially as requested by user
+  // No case is loaded initially
   const [caseData, setCaseData] = useState<CaseDossier | null>(null);
   const [presetCases, setPresetCases] = useState<CaseDossier[]>(PRESET_CASES);
 
@@ -219,44 +220,83 @@ export default function App() {
     }
   };
 
-  // Start Consultation from Main Menu
+  // Start Consultation from Main Menu (Opens ONLY the design room)
   const handleStartConsultationFromMenu = () => {
-    setCurrentTab('consult');
-    setCurrentView('game');
+    soundManager.playPaperRustle();
+    setCurrentView('consult');
   };
 
-  // Case switched or generated
-  const handleCaseLoaded = (newCase: CaseDossier) => {
+  // When Case is confirmed and generated, go DIRECTLY to the courtroom!
+  const handleCaseCreatedAndEnterCourt = (newCase: CaseDossier) => {
     setCaseData(newCase);
-    setCurrentTab('dossier');
+    setCurrentTab('court'); // Direct entry to Courtroom as requested!
     setCurrentView('game');
-    soundManager.playDramaticSting();
+    soundManager.playGavel();
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0c12] text-[#c5c6c7] font-['Vazirmatn',sans-serif] selection:bg-amber-800/40 selection:text-amber-200">
-      {/* Courtroom Ambient Glow */}
-      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-950/15 via-[#0b0c12] to-[#08090d] pointer-events-none -z-10" />
-
-      {/* 1. Main Menu View (Initial state when app opens) */}
-      {currentView === 'menu' ? (
+    <div className="min-h-screen bg-[#0a0b10] text-[#c5c6c7] font-['Vazirmatn',sans-serif] selection:bg-amber-800/40 selection:text-amber-200">
+      {/* 1. Main Menu View */}
+      {currentView === 'menu' && (
         <MainMenu
           onStartConsultation={handleStartConsultationFromMenu}
           presetCases={presetCases}
-          onSelectCase={handleCaseLoaded}
+          onSelectCase={handleCaseCreatedAndEnterCourt}
           isSoundOn={isSoundOn}
           setIsSoundOn={setIsSoundOn}
           onGavelStrike={handleGavelClick}
         />
-      ) : (
-        /* 2. In-Session Game View */
+      )}
+
+      {/* 2. Dedicated Standalone Consultation & Design Room (ONLY this page is shown!) */}
+      {currentView === 'consult' && (
+        <div className="min-h-screen flex flex-col bg-[#0b0c14]">
+          {/* Focused Top Bar without distracting tabs */}
+          <header className="sticky top-0 z-40 bg-[#0f111c]/95 backdrop-blur-md border-b border-amber-900/40 px-4 py-3 flex items-center justify-between shadow-xl">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  soundManager.playPaperRustle();
+                  setCurrentView('menu');
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-amber-300 text-xs font-semibold transition-all cursor-pointer shadow-sm group"
+              >
+                <Home className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>بازگشت به منوی اصلی</span>
+              </button>
+
+              <div className="h-5 w-px bg-stone-800 hidden sm:block" />
+
+              <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-amber-100">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>اتاق مشورت بازپرسی و طراحی پرونده با جمینای</span>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-stone-400 hidden md:block">
+              پس از توافق نهایی با جمینای، مستقیماً وارد صحن دادگاه خواهید شد.
+            </div>
+          </header>
+
+          <main className="flex-1 pb-10">
+            <ConsultationRoom
+              onCaseGenerated={handleCaseCreatedAndEnterCourt}
+              presetCases={presetCases}
+              onSelectPresetCase={handleCaseCreatedAndEnterCourt}
+            />
+          </main>
+        </div>
+      )}
+
+      {/* 3. In-Session Game View (Enters directly to Courtroom upon case finalization) */}
+      {currentView === 'game' && caseData && (
         <div className="flex flex-col min-h-screen">
           {/* Top Navbar */}
           <Navbar
             currentTab={currentTab}
             setCurrentTab={setCurrentTab}
-            caseTitle={caseData ? caseData.title : 'طراحی پرونده با هوش مصنوعی'}
-            caseNumber={caseData ? caseData.caseNumber : 'کلاسه جدید'}
+            caseTitle={caseData.title}
+            caseNumber={caseData.caseNumber}
             isSoundOn={isSoundOn}
             setIsSoundOn={setIsSoundOn}
             onGavelClick={handleGavelClick}
@@ -267,18 +307,9 @@ export default function App() {
             }}
           />
 
-          {/* Main View Area */}
-          <main className="flex-1 pb-16">
-            {currentTab === 'dossier' && caseData && (
-              <CaseDossierView
-                caseData={caseData}
-                onSelectCharacterForCourt={handleSelectCharacterForCourt}
-                onOpenVerdictModal={() => setIsVerdictModalOpen(true)}
-                onPresentEvidenceInCourt={handlePresentEvidenceInCourt}
-              />
-            )}
-
-            {currentTab === 'court' && caseData && (
+          {/* Main Courtroom or Dossier Area */}
+          <main className="flex-1 pb-12">
+            {currentTab === 'court' && (
               <CourtroomView
                 caseData={caseData}
                 activeCharacterId={activeCharacterId}
@@ -290,10 +321,21 @@ export default function App() {
                 characterStressMap={characterStressMap}
                 selectedEvidenceToConfront={selectedEvidenceToConfront}
                 setSelectedEvidenceToConfront={setSelectedEvidenceToConfront}
+                onOpenDossier={() => setCurrentTab('dossier')}
+                onOpenVerdict={() => setIsVerdictModalOpen(true)}
               />
             )}
 
-            {currentTab === 'verdict' && caseData && (
+            {currentTab === 'dossier' && (
+              <CaseDossierView
+                caseData={caseData}
+                onSelectCharacterForCourt={handleSelectCharacterForCourt}
+                onOpenVerdictModal={() => setIsVerdictModalOpen(true)}
+                onPresentEvidenceInCourt={handlePresentEvidenceInCourt}
+              />
+            )}
+
+            {currentTab === 'verdict' && (
               <div className="max-w-4xl mx-auto px-4 py-8">
                 <div className="p-8 rounded-3xl bg-[#131520] border border-amber-900/30 text-center space-y-4 shadow-2xl">
                   <h2 className="text-2xl font-bold text-amber-100">صحن انشای رأی نهایی دیوان عدالت</h2>
@@ -313,54 +355,26 @@ export default function App() {
               </div>
             )}
 
-            {/* If user switched to dossier or court without a case loaded yet */}
-            {(currentTab === 'dossier' || currentTab === 'court' || currentTab === 'verdict') && !caseData && (
-              <div className="max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-                <div className="p-8 rounded-3xl bg-[#131522] border border-stone-800 space-y-4 shadow-xl">
-                  <h3 className="text-lg font-bold text-stone-200">هنوز پرونده‌ای برای این دادگاه باز نشده است</h3>
-                  <p className="text-xs text-stone-400 leading-relaxed">
-                    ابتدا با جمینای پرونده دلخواه خود را طراحی کنید یا از بایگانی پرونده‌ها یکی را برگزینید.
-                  </p>
-                  <div className="flex items-center justify-center gap-3">
-                    <button
-                      onClick={() => setCurrentTab('consult')}
-                      className="px-5 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-600 text-stone-100 text-xs font-bold transition-all cursor-pointer"
-                    >
-                      طراحی پرونده با جمینای
-                    </button>
-                    <button
-                      onClick={() => setCurrentView('menu')}
-                      className="px-5 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-300 text-xs font-semibold transition-all cursor-pointer"
-                    >
-                      بازگشت به منوی اصلی
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {currentTab === 'consult' && (
               <ConsultationRoom
-                onCaseGenerated={handleCaseLoaded}
+                onCaseGenerated={handleCaseCreatedAndEnterCourt}
                 presetCases={presetCases}
-                onSelectPresetCase={handleCaseLoaded}
+                onSelectPresetCase={handleCaseCreatedAndEnterCourt}
               />
             )}
           </main>
 
           {/* Verdict Modal */}
-          {caseData && (
-            <VerdictModal
-              caseData={caseData}
-              isOpen={isVerdictModalOpen}
-              onClose={() => setIsVerdictModalOpen(false)}
-              onSubmitVerdict={handleSubmitVerdict}
-              onStartNewCase={() => {
-                setIsVerdictModalOpen(false);
-                setCurrentTab('consult');
-              }}
-            />
-          )}
+          <VerdictModal
+            caseData={caseData}
+            isOpen={isVerdictModalOpen}
+            onClose={() => setIsVerdictModalOpen(false)}
+            onSubmitVerdict={handleSubmitVerdict}
+            onStartNewCase={() => {
+              setIsVerdictModalOpen(false);
+              setCurrentView('consult');
+            }}
+          />
         </div>
       )}
     </div>

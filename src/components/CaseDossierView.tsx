@@ -58,12 +58,12 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
 
         <div className="max-w-3xl space-y-3">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl overflow-hidden border border-amber-500/40 shadow-lg shadow-amber-950/60 bg-stone-900 shrink-0">
+            <div className="w-12 h-12 rounded-full overflow-hidden border border-amber-500/40 shadow-lg shadow-amber-950/60 bg-stone-900 shrink-0">
               <img
                 src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
                 alt="مهر رسمی پرونده"
                 referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover scale-[1.15]"
               />
             </div>
             <div>
