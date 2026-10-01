@@ -1,0 +1,344 @@
+import React, { useState } from 'react';
+import {
+  Scale,
+  Sparkles,
+  BookOpen,
+  FolderOpen,
+  Gavel,
+  ShieldAlert,
+  Volume2,
+  VolumeX,
+  ChevronLeft,
+  Search,
+  Clock,
+  MapPin,
+  AlertTriangle,
+  X,
+  Play
+} from 'lucide-react';
+import { CaseDossier } from '../types.ts';
+import { soundManager } from '../utils/audio.ts';
+
+interface MainMenuProps {
+  onStartConsultation: () => void;
+  presetCases: CaseDossier[];
+  onSelectCase: (selectedCase: CaseDossier) => void;
+  isSoundOn: boolean;
+  setIsSoundOn: (val: boolean) => void;
+  onGavelStrike: () => void;
+}
+
+export const MainMenu: React.FC<MainMenuProps> = ({
+  onStartConsultation,
+  presetCases,
+  onSelectCase,
+  isSoundOn,
+  setIsSoundOn,
+  onGavelStrike,
+}) => {
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [previewCase, setPreviewCase] = useState<CaseDossier | null>(null);
+
+  const toggleSound = () => {
+    const next = !isSoundOn;
+    setIsSoundOn(next);
+    soundManager.setSoundEnabled(next);
+    if (next) soundManager.playGavel();
+  };
+
+  return (
+    <div className="relative min-h-screen flex flex-col justify-between overflow-hidden bg-[#0a0b10] text-[#c5c6c7] p-4 sm:p-6 md:p-10 select-none">
+      {/* Background Visual Texture & Light Cone */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-amber-950/25 via-[#0b0c14] to-[#07080b] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-amber-500/5 blur-[120px] pointer-events-none rounded-full" />
+
+      {/* Top Header Controls */}
+      <header className="relative z-10 flex items-center justify-between max-w-6xl mx-auto w-full">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl overflow-hidden border border-amber-500/40 shadow-md shadow-amber-950/50 bg-stone-900 shrink-0">
+            <img
+              src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
+              alt="نشان رسمی دادگاه"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <span className="text-xs md:text-sm font-semibold text-stone-300 tracking-wider">
+            دیوان عالی امور جنایی • شعبه ویژه قضاوت
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              soundManager.playGavel();
+              onGavelStrike();
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-850 border border-stone-800 text-stone-300 hover:text-amber-300 text-xs font-medium transition-all cursor-pointer shadow"
+            title="تست ضربه چکش دادگاه"
+          >
+            <Gavel className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">ضربه چکش</span>
+          </button>
+
+          <button
+            onClick={toggleSound}
+            className="p-2 rounded-xl bg-stone-900/90 hover:bg-stone-850 border border-stone-800 text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+            title={isSoundOn ? 'قطع صدا' : 'وصل صدا'}
+          >
+            {isSoundOn ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4 text-stone-500" />}
+          </button>
+        </div>
+      </header>
+
+      {/* Hero Branding Section */}
+      <div className="relative z-10 max-w-4xl mx-auto w-full text-center my-auto py-6 space-y-6">
+        {/* Judicial Crest Emblem (Hero Image Logo) */}
+        <div className="relative inline-block">
+          <div className="w-36 h-36 sm:w-44 sm:h-44 mx-auto rounded-3xl overflow-hidden border-2 border-amber-500/50 shadow-2xl shadow-amber-950/80 bg-stone-900 ring-4 ring-amber-500/20 group hover:border-amber-400 transition-all duration-300">
+            <img
+              src="/src/assets/images/court_gavel_logo_1790814378414.jpg"
+              alt="نشان رسمی دادگاه آقای قاضی"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          </div>
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-red-950/90 border border-red-500/60 text-red-300 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-1.5 whitespace-nowrap">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span>نشان رسمی دادگاه جنایی</span>
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="space-y-3">
+          <h1 className="text-4xl sm:text-6xl md:text-7xl font-black text-amber-100 tracking-tight font-serif drop-shadow-lg">
+            آقای قاضی
+          </h1>
+          <p className="text-sm sm:text-base md:text-lg text-amber-200/80 font-medium max-w-2xl mx-auto leading-relaxed">
+            شبیه‌ساز هوشمند دادرسی، بازجویی از متهمان فریبکار و کشف حقیقت جنایی با قدرت جمینای
+          </p>
+        </div>
+
+        {/* Action Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto pt-4 text-right">
+          {/* Card 1: Custom Case with Gemini */}
+          <button
+            onClick={() => {
+              soundManager.playPaperRustle();
+              onStartConsultation();
+            }}
+            className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#191c2b] via-[#141624] to-[#10121d] border border-purple-500/40 hover:border-purple-400/80 shadow-xl hover:shadow-purple-950/40 transition-all duration-200 cursor-pointer flex flex-col justify-between space-y-4 hover:-translate-y-0.5"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300">
+                  <Sparkles className="w-5 h-5 text-purple-400" />
+                </div>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  طراحی با جمینای
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-stone-100 group-hover:text-purple-200 transition-colors">
+                طراحی پرونده سفارشی جدید
+              </h3>
+              <p className="text-xs text-stone-400 leading-relaxed">
+                قبل از دادگاه با جمینای گفتگو کنید؛ نوع جنایت، الایبی و دروغ‌های متهم را تعیین کرده و پرونده‌ای کاملاً تازه بسازید.
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between text-xs font-bold text-purple-300 group-hover:text-purple-200 border-t border-purple-900/40">
+              <span>ورود به اتاق مشورت و ساخت سناریو</span>
+              <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+            </div>
+          </button>
+
+          {/* Card 2: Court Archive (Preset Cases) */}
+          <button
+            onClick={() => {
+              soundManager.playPaperRustle();
+              setShowArchiveModal(true);
+            }}
+            className="group relative p-6 rounded-2xl bg-gradient-to-br from-[#1c1a24] via-[#161420] to-[#111019] border border-amber-600/40 hover:border-amber-400/80 shadow-xl hover:shadow-amber-950/40 transition-all duration-200 cursor-pointer flex flex-col justify-between space-y-4 hover:-translate-y-0.5"
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300">
+                  <FolderOpen className="w-5 h-5 text-amber-400" />
+                </div>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  ۳ پرونده آماده
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-stone-100 group-hover:text-amber-200 transition-colors">
+                بایگانی پرونده‌های راکد دادسرا
+              </h3>
+              <p className="text-xs text-stone-400 leading-relaxed">
+                قتل با سیانور در عمارت نیاوران، شلیک شبانه در جاده فشم، یا سقوط از طبقه ۲۳ برج سپهر با مدارک کامل آماده دادرسی.
+              </p>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between text-xs font-bold text-amber-300 group-hover:text-amber-200 border-t border-amber-900/40">
+              <span>انتخاب از پرونده‌های طلایی</span>
+              <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+            </div>
+          </button>
+        </div>
+
+        {/* Guide Trigger */}
+        <div className="pt-3">
+          <button
+            onClick={() => {
+              soundManager.playPaperRustle();
+              setShowGuideModal(true);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#141620] hover:bg-[#1a1d2c] border border-stone-850 hover:border-stone-700 text-stone-400 hover:text-stone-200 text-xs font-medium transition-all cursor-pointer"
+          >
+            <BookOpen className="w-4 h-4 text-amber-400" />
+            <span>راهنمای آیین دادرسی و قواعد بازی قضاوت</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="relative z-10 text-center text-[11px] text-stone-500 py-3 border-t border-stone-900/60 max-w-6xl mx-auto w-full flex flex-wrap items-center justify-between gap-2">
+        <span>سامانه هوشمند دادگاه‌های کیفری یک • کلیه شخصیت‌ها و وقایع ساختگی هستند.</span>
+        <span className="font-mono text-stone-600">نسخه ۱.۰ - مجهز به مدل Gemini 3.8 Flash</span>
+      </footer>
+
+      {/* Archive Modal (Choose from 3 Master Cases) */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-3xl bg-[#12141e] border border-amber-900/50 rounded-3xl shadow-2xl overflow-hidden text-stone-200 max-h-[88vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 bg-[#181a28] border-b border-stone-800">
+              <div className="flex items-center gap-3">
+                <FolderOpen className="w-5 h-5 text-amber-400" />
+                <div>
+                  <h3 className="text-base font-bold text-amber-100">بایگانی پرونده‌های ویژه دادگاه</h3>
+                  <span className="text-xs text-stone-400">یک پرونده را برای بررسی و ورود به جلسه دادرسی انتخاب کنید:</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowArchiveModal(false)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-4">
+              {presetCases.map((caseItem) => (
+                <div
+                  key={caseItem.id}
+                  className="p-4 rounded-2xl bg-[#161826] border border-stone-800 hover:border-amber-500/40 transition-all space-y-3 shadow-md"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-800/80 pb-2.5">
+                    <div>
+                      <span className="text-xs font-mono text-amber-400 font-bold ml-2">کلاسه {caseItem.caseNumber}</span>
+                      <h4 className="text-base font-bold text-stone-100 inline">{caseItem.title}</h4>
+                    </div>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-red-950/50 text-red-300 border border-red-800/40 font-semibold">
+                      {caseItem.genre}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-stone-300 leading-relaxed bg-[#11131c] p-3 rounded-xl border border-stone-850">
+                    {caseItem.briefing}
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-stone-400">
+                    <div>
+                      <strong className="text-stone-300">مقتول:</strong> {caseItem.victimName}
+                    </div>
+                    <div>
+                      <strong className="text-stone-300">تعداد متهمان/شهود:</strong> {caseItem.characters.length} نفر
+                    </div>
+                    <div>
+                      <strong className="text-stone-300">مدارک ثبت‌شده:</strong> {caseItem.evidence.length} مدرک آزمایشگاهی
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={() => {
+                        soundManager.playGavel();
+                        onSelectCase(caseItem);
+                        setShowArchiveModal(false);
+                      }}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-extrabold text-xs shadow-lg shadow-amber-950/40 transition-all cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-stone-950" />
+                      <span>گشودن این پرونده و ورود به دادرسی</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Guide Modal */}
+      {showGuideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl bg-[#12141e] border border-amber-900/50 rounded-3xl shadow-2xl overflow-hidden text-stone-200 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 bg-[#181a28] border-b border-stone-800">
+              <div className="flex items-center gap-3">
+                <BookOpen className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-amber-100">آیین دادرسی و دستورالعمل قضاوت</h3>
+              </div>
+              <button
+                onClick={() => setShowGuideModal(false)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-4 text-xs md:text-sm leading-relaxed text-stone-300">
+              <div className="p-4 rounded-xl bg-[#171926] border border-stone-800 space-y-2">
+                <h4 className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs">۱</span>
+                  مرحله اول: مطالعه پرونده و گزارش کالبدشکافی
+                </h4>
+                <p className="text-xs text-stone-400">
+                  ابتدا گزارش صحنه جرم، علت مستقیم فوت، زمان مرگ و مدارک کشف شده را در برگه پرونده به دقت مرور کنید. هر ساعت و هر نمونه آزمایشگاهی ممکن است کلید شکستن دروغ متهم باشد.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#171926] border border-stone-800 space-y-2">
+                <h4 className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs">۲</span>
+                  مرحله دوم: احضار به جایگاه و استیضاح زنده
+                </h4>
+                <p className="text-xs text-stone-400">
+                  شخص مظنون یا شاهدان را احضار کنید. متهم زیر نظر جمینای کنترل می‌شود و تمام سعی خود را می‌کند تا با توجیه حضور خود، صحنه‌سازی یا تهمت زدن به دیگران شما را فریب دهد!
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#171926] border border-stone-800 space-y-2">
+                <h4 className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs">۳</span>
+                  مرحله سوم: مواجهه با مدارک و ایجاد لغزش کلامی
+                </h4>
+                <p className="text-xs text-stone-400">
+                  از دکمه «ارائه مدرک» استفاده کنید تا متهم را با اثر انگشت، رد تایر، فندک یا گزارش سم‌شناسی گوشه رینگ ببرید. با تحت فشار قرار گرفتن متهم، نشانگر اضطراب او بالا رفته و تناقض‌گویی خواهد کرد.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#171926] border border-stone-800 space-y-2">
+                <h4 className="font-bold text-amber-300 flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center text-xs">۴</span>
+                  مرحله چهارم: انشای دادنامه و ارزیابی دیوان عدالت
+                </h4>
+                <p className="text-xs text-stone-400">
+                  پس از تکمیل تحقیقات، وارد برگه رأی نهایی شوید و استدلال قضایی خود را بنویسید. سپس چکش دادگاه را بکوبید تا جمینای حقیقت واقعی را فاش کند و امتیاز هوش قضایی شما را محاسبه نماید.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

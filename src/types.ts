@@ -1,0 +1,93 @@
+export type CharacterRole = 'defendant' | 'plaintiff' | 'defense_lawyer' | 'expert' | 'witness';
+
+export interface EvidenceItem {
+  id: string;
+  title: string;
+  type: 'physical' | 'document' | 'digital' | 'forensic';
+  description: string;
+  foundAt: string;
+  significance: string;
+  iconName?: string;
+  labReport?: string;
+}
+
+export interface Character {
+  id: string;
+  name: string;
+  role: CharacterRole;
+  roleTitle: string; // e.g. "متهم اصلی", "شاکی پرونده", "وکیل مدافع", "پزشک قانونی", "شاهد عینی"
+  age: number;
+  occupation: string;
+  relationToVictim: string;
+  personality: string;
+  avatarDescription?: string;
+  avatarMood?: 'neutral' | 'nervous' | 'angry' | 'smug' | 'broken';
+  initialStatement: string;
+  suspicionLevel: number; // 0 to 100
+  isLying: boolean;
+  deceptionStrategy?: string; // strategy to fool the judge
+  vulnerabilities?: string[]; // contradictory evidence that breaks their story
+}
+
+export interface AutopsyReport {
+  timeOfDeath: string;
+  causeOfDeath: string;
+  toxicology: string;
+  injuries: string[];
+  coronerNotes: string;
+}
+
+export interface HiddenTruth {
+  realCulpritId: string;
+  realCulpritName: string;
+  motive: string;
+  howCrimeHappened: string;
+  keyContradiction: string;
+  accomplices?: string;
+}
+
+export interface CaseDossier {
+  id: string;
+  caseNumber: string; // e.g. "۱۴۰۵/۸۲۹-ج"
+  title: string;
+  genre: string;
+  incidentDate: string;
+  location: string;
+  victimName: string;
+  victimBackground: string;
+  briefing: string;
+  autopsyReport: AutopsyReport;
+  evidence: EvidenceItem[];
+  characters: Character[];
+  hiddenTruth: HiddenTruth;
+}
+
+export interface InterrogationMessage {
+  id: string;
+  sender: 'judge' | 'character' | 'lawyer';
+  senderName: string;
+  characterId?: string;
+  text: string;
+  innerThought?: string;
+  timestamp: string;
+  evidencePresented?: EvidenceItem;
+  stressDelta?: number;
+  slipUp?: string;
+}
+
+export interface VerdictResult {
+  isCorrect: boolean;
+  justiceRating: number; // 0 to 100
+  truthRevealed: string;
+  feedback: string;
+  deceptionBusted: boolean;
+  epilogue: string;
+  culpritConfession?: string;
+}
+
+export interface ConsultationMessage {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  timestamp: string;
+}
