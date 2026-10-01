@@ -100,41 +100,41 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
         </div>
 
         {/* Printable Official Document Canvas */}
-        <div className="flex-1 p-5 md:p-8 overflow-y-auto custom-scrollbar bg-[#fcf9f0] print:p-0 print:bg-white text-stone-900 relative selection:bg-amber-200 font-sans">
+        <div className="flex-1 p-2 sm:p-5 md:p-8 overflow-y-auto custom-scrollbar bg-[#fcf9f0] print:p-0 print:bg-white text-stone-900 relative selection:bg-amber-200 font-sans">
           {/* Official Watermark background */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none">
-            <div className="text-center font-serif text-8xl font-black rotate-[-30deg] tracking-widest text-amber-950">
+            <div className="text-center font-serif text-6xl sm:text-8xl font-black rotate-[-30deg] tracking-widest text-amber-950">
               قوه قضائیه
             </div>
           </div>
 
           {/* Document Decorative Double Border */}
-          <div className="border-4 border-amber-900/80 p-5 md:p-8 rounded-xl relative bg-gradient-to-b from-[#fffef9] via-[#fdfbf3] to-[#fcf8ec] shadow-inner">
+          <div className="border-2 sm:border-4 border-amber-900/80 p-3 sm:p-5 md:p-8 rounded-xl relative bg-gradient-to-b from-[#fffef9] via-[#fdfbf3] to-[#fcf8ec] shadow-inner">
             {/* Inner fine border line */}
-            <div className="border border-amber-800/40 p-4 rounded-lg space-y-6">
+            <div className="border border-amber-800/40 p-2.5 sm:p-4 rounded-lg space-y-4 sm:space-y-6">
               
               {/* Header Emblem & Title */}
-              <div className="text-center space-y-2 border-b-2 border-amber-900/30 pb-4 relative">
+              <div className="text-center space-y-2 border-b-2 border-amber-900/30 pb-3 sm:pb-4 relative">
                 {/* Top Official Crest */}
-                <div className="flex items-center justify-between text-[11px] font-mono text-stone-700 mb-2 border-b border-stone-300 pb-2">
+                <div className="flex flex-col sm:flex-row items-center justify-between text-[10px] sm:text-[11px] font-mono text-stone-700 mb-2 border-b border-stone-300 pb-2 gap-1.5 text-center sm:text-right">
                   <div>
                     <span className="block font-bold">شماره کلاسه: {caseData.caseNumber}</span>
                     <span className="block">تاریخ صدور: {currentDate}</span>
                   </div>
-                  <div className="text-center">
-                    <span className="font-extrabold text-sm text-stone-900 block font-serif">«بسمه تعالی»</span>
-                    <span className="text-[10px] text-stone-600">جمهوری اسلامی ایران • قوه قضائیه</span>
+                  <div className="text-center py-1 sm:py-0">
+                    <span className="font-extrabold text-xs sm:text-sm text-stone-900 block font-serif">«بسمه تعالی»</span>
+                    <span className="text-[9px] sm:text-[10px] text-stone-600">جمهوری اسلامی ایران • قوه قضائیه</span>
                   </div>
-                  <div className="text-left">
+                  <div className="text-center sm:text-left">
                     <span className="block font-bold">شعبه: {labels.courtBranchTitle}</span>
                     <span className="block">طبقه بندی: محرمانه قضایی</span>
                   </div>
                 </div>
 
-                <h1 className="text-xl md:text-2xl font-black text-amber-950 font-serif tracking-tight pt-1">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-black text-amber-950 font-serif tracking-tight pt-1">
                   {isIndictment ? '« کیـفرخـواست دادسـرا »' : '« داد نـامـه و رأی نـهـائـی دادگـاه »'}
                 </h1>
-                <p className="text-xs text-stone-700 font-medium">
+                <p className="text-[11px] sm:text-xs text-stone-700 font-medium">
                   {isIndictment
                     ? `صدور توسط دادسرا و ارجاع به صحن علنی ${labels.courtBranchTitle}`
                     : `صادره از شعبه اول ${labels.courtBranchTitle} در خصوص پرونده`}
@@ -142,15 +142,22 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
               </div>
 
               {/* Case Profile Information Grid */}
-              <div className="bg-amber-100/40 border border-amber-800/30 rounded-lg p-3 text-xs leading-relaxed space-y-2">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-stone-800">
+              <div className="bg-amber-100/40 border border-amber-800/30 rounded-lg p-2.5 sm:p-3 text-[11px] sm:text-xs leading-relaxed space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2 text-stone-800">
                   <div><strong className="text-amber-950">موضوع اتهام:</strong> {caseData.title}</div>
                   <div><strong className="text-amber-950">محل وقوع:</strong> {caseData.location}</div>
                   <div><strong className="text-amber-950">{labels.victimOrPartyLabel}</strong> {caseData.victimName}</div>
-                  <div><strong className="text-amber-950">متهم ردیف اول:</strong> {targetAccusedName}</div>
+                  <div><strong className="text-amber-950">شخص مورد دادرسی:</strong> {targetAccusedName}</div>
                   <div><strong className="text-amber-950">تاریخ وقوع:</strong> {caseData.incidentDate}</div>
                   <div><strong className="text-amber-950">مرجع رسیدگی:</strong> {labels.courtBranchTitle}</div>
                 </div>
+
+                {caseData.characters.length > 1 && (
+                  <div className="pt-2 border-t border-amber-800/20 text-[11px] text-stone-700">
+                    <strong className="text-amber-950">اشخاص و طرفین احضارشده در پرونده ({caseData.characters.length} نفر):</strong>{' '}
+                    {caseData.characters.map((c) => `${c.name} (${c.occupation})`).join(' ، ')}
+                  </div>
+                )}
               </div>
 
               {/* Document Main Content Body */}

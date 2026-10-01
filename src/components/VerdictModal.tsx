@@ -91,38 +91,38 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
         soundManager.playPaperRustle();
         onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-3xl bg-[#12141e] border border-amber-900/40 rounded-3xl shadow-2xl overflow-hidden text-stone-200 max-h-[90vh] flex flex-col cursor-default select-text"
+        className="relative w-full max-w-3xl bg-[#12141e] border border-amber-900/40 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden text-stone-200 max-h-[92vh] flex flex-col cursor-default select-text"
       >
         {/* Top Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#1c1f2e] to-[#151724] border-b border-stone-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-950/60 border border-red-500/40 flex items-center justify-center">
-              <Scale className="w-5 h-5 text-red-400" />
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-[#1c1f2e] to-[#151724] border-b border-stone-800">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-red-950/60 border border-red-500/40 flex items-center justify-center shrink-0">
+              <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
             </div>
-            <div>
-              <span className="text-xs text-stone-400 block font-mono">پرونده کلاسه {caseData.caseNumber}</span>
-              <h3 className="text-lg font-bold text-amber-100">انشای دادنامه و صدور حکم نهایی دادگاه</h3>
+            <div className="min-w-0">
+              <span className="text-[10px] sm:text-xs text-stone-400 block font-mono truncate">پرونده کلاسه {caseData.caseNumber}</span>
+              <h3 className="text-xs sm:text-base md:text-lg font-bold text-amber-100 truncate">انشای دادنامه و صدور حکم نهایی دادگاه</h3>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="flex-1 p-6 overflow-y-auto custom-scrollbar space-y-6">
+        <div className="flex-1 p-3.5 sm:p-6 overflow-y-auto custom-scrollbar space-y-4 sm:space-y-6">
           {!result ? (
             /* Verdict Form */
-            <form onSubmit={handleIssueVerdict} className="space-y-6">
-              <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-800/30 text-xs text-amber-200/90 leading-relaxed">
-                جناب قاضی، جلسه رسیدگی به پایان رسیده است. پس از استماع اظهارات شاکی، مدافعات متهم و وکیل، و مداقه در شواهد پزشکی قانونی، اکنون نوبت انشای رأی مستقل شماست. دقت کنید که متهم تمام توان خود را برای گمراه کردن شما به کار بسته بود!
+            <form onSubmit={handleIssueVerdict} className="space-y-4 sm:space-y-6">
+              <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-amber-950/20 border border-amber-800/30 text-xs text-amber-200/90 leading-relaxed">
+                جناب قاضی، جلسه رسیدگی به پایان رسیده است. پس از استماع اظهارات طرفین و مداقه در شواهد کارشناسی، اکنون نوبت انشای رأی مستقل شماست.
               </div>
 
               {/* Step 1: Select Person */}
@@ -130,7 +130,7 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                 <label className="text-xs font-bold text-stone-300 block">
                   ۱. شخص مورد نظر برای صدور رأی را مشخص کنید:
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                   {caseData.characters.map((char) => (
                     <button
                       key={char.id}
@@ -139,14 +139,14 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                         setSelectedAccusedId(char.id);
                         soundManager.playPaperRustle();
                       }}
-                      className={`p-3 rounded-xl border text-right transition-all cursor-pointer ${
+                      className={`p-2.5 sm:p-3 rounded-xl border text-right transition-all cursor-pointer ${
                         selectedAccusedId === char.id
                           ? 'bg-amber-600/20 border-amber-500 ring-1 ring-amber-500/50'
                           : 'bg-[#181a26] border-stone-800 hover:bg-[#1f2233]'
                       }`}
                     >
                       <span className="text-xs font-bold text-stone-200 block truncate">{char.name}</span>
-                      <span className="text-[10px] text-stone-400 block truncate">{char.roleTitle}</span>
+                      <span className="text-[10px] text-stone-400 block truncate">{char.occupation} ({char.age} ساله)</span>
                     </button>
                   ))}
                 </div>
@@ -157,10 +157,10 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                 <label className="text-xs font-bold text-stone-300 block">
                   ۲. تصمیم قضایی شما در خصوص {selectedChar?.name || 'فرد منتخب'}:
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <label
                     onClick={() => setVerdictType('guilty')}
-                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    className={`flex items-center gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl border cursor-pointer transition-all ${
                       verdictType === 'guilty'
                         ? 'bg-red-950/30 border-red-500 ring-1 ring-red-500/40 text-red-200'
                         : 'bg-[#181a26] border-stone-800 text-stone-400 hover:bg-[#1e2130]'
@@ -175,14 +175,14 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                       className="accent-red-500"
                     />
                     <div>
-                      <span className="text-xs font-bold block text-stone-100">احراز مجرمیت و محکومیت کیفری</span>
-                      <span className="text-[11px] text-stone-400">فرد به عنوان مرتکب اصلی یا شریک جرم شناخته شد.</span>
+                      <span className="text-xs font-bold block text-stone-100">احراز مجرمیت و محکومیت</span>
+                      <span className="text-[10px] sm:text-[11px] text-stone-400">فرد به عنوان مرتکب اصلی یا شریک جرم شناخته شد.</span>
                     </div>
                   </label>
 
                   <label
                     onClick={() => setVerdictType('acquitted')}
-                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                    className={`flex items-center gap-2.5 sm:gap-3 p-3 sm:p-3.5 rounded-xl border cursor-pointer transition-all ${
                       verdictType === 'acquitted'
                         ? 'bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/40 text-emerald-200'
                         : 'bg-[#181a26] border-stone-800 text-stone-400 hover:bg-[#1e2130]'
@@ -198,7 +198,7 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                     />
                     <div>
                       <span className="text-xs font-bold block text-stone-100">حکم برائت کامل (بی‌گناهی)</span>
-                      <span className="text-[11px] text-stone-400">فقدان ادله اثباتی و عدم احراز سوءنیت مجرمانه.</span>
+                      <span className="text-[10px] sm:text-[11px] text-stone-400">فقدان ادله اثباتی و عدم احراز سوءنیت مجرمانه.</span>
                     </div>
                   </label>
                 </div>
@@ -213,7 +213,7 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                   <select
                     value={penalty}
                     onChange={(e) => setPenalty(e.target.value)}
-                    className="w-full bg-[#161824] border border-stone-700 rounded-xl px-4 py-2.5 text-xs md:text-sm text-stone-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+                    className="w-full bg-[#161824] border border-stone-700 rounded-xl px-3 sm:px-4 py-2.5 text-xs sm:text-sm text-stone-200 focus:outline-none focus:border-amber-500 cursor-pointer min-h-[42px]"
                   >
                     <option value="قصاص نفس (اشد مجازات قانونی)">قصاص نفس (اشد مجازات قانونی قتل عمد)</option>
                     <option value="حبس ابد با اعمال شاقه">حبس ابد با اعمال شاقه</option>
@@ -232,8 +232,8 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                   rows={4}
                   value={reasoning}
                   onChange={(e) => setReasoning(e.target.value)}
-                  placeholder="جناب قاضی، دلایل محکومیت یا برائت را ذکر کنید (مثلاً: تناقض ساعت مرگ با ادعای متهم، اثر انگشت روی سلاح/فنجان، فریبکاری در الایبی و...)"
-                  className="w-full bg-[#0f1118] border border-stone-700 rounded-xl p-4 text-xs md:text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500 leading-relaxed font-sans"
+                  placeholder="جناب قاضی، دلایل محکومیت یا برائت را ذکر کنید (مثلاً: تناقض ساعت حضور با ادعای متهم، اثر انگشت، رد مال و...)"
+                  className="w-full bg-[#0f1118] border border-stone-700 rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500 leading-relaxed font-sans"
                   required
                 />
               </div>
@@ -243,9 +243,9 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || !reasoning.trim()}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-700 via-amber-700 to-amber-800 hover:from-red-600 hover:to-amber-700 text-stone-100 font-extrabold text-sm md:text-base shadow-xl shadow-red-950/50 flex items-center justify-center gap-3 transition-all disabled:opacity-50 cursor-pointer active:scale-98"
+                  className="w-full py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-gradient-to-r from-red-700 via-amber-700 to-amber-800 hover:from-red-600 hover:to-amber-700 text-stone-100 font-extrabold text-xs sm:text-base shadow-xl shadow-red-950/50 flex items-center justify-center gap-2.5 sm:gap-3 transition-all disabled:opacity-50 cursor-pointer active:scale-98 min-h-[44px]"
                 >
-                  <Gavel className="w-5 h-5 text-amber-300" />
+                  <Gavel className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
                   <span>
                     {isSubmitting ? 'در حال ثبت رأی در دیوان عالی دادگستری...' : 'ختم جلسه دادرسی و صدور قطعی حکم دادگاه'}
                   </span>
@@ -254,29 +254,29 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
             </form>
           ) : (
             /* Post-Verdict Truth & Score Reveal */
-            <div className="space-y-6 animate-in zoom-in-95 duration-300">
+            <div className="space-y-4 sm:space-y-6 animate-in zoom-in-95 duration-300">
               {/* Score Header Card */}
-              <div className="p-6 rounded-2xl bg-gradient-to-br from-[#1a1d2d] to-[#121420] border border-amber-500/30 text-center space-y-3 shadow-xl">
-                <div className="inline-flex p-3 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 mb-1">
+              <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-[#1a1d2d] to-[#121420] border border-amber-500/30 text-center space-y-2 sm:space-y-3 shadow-xl">
+                <div className="inline-flex p-2.5 sm:p-3 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 mb-1">
                   {result.isCorrect ? (
-                    <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                    <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-emerald-400" />
                   ) : (
-                    <AlertTriangle className="w-8 h-8 text-red-400" />
+                    <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-red-400" />
                   )}
                 </div>
 
-                <h3 className="text-xl md:text-2xl font-extrabold text-amber-100">
+                <h3 className="text-base sm:text-xl md:text-2xl font-extrabold text-amber-100">
                   {result.isCorrect
                     ? 'عدالت اجرا شد! شما حقیقت را کشف کردید'
                     : 'فریب دروغ متهم را خوردید یا عدالت مخدوش شد'}
                 </h3>
 
-                <div className="flex items-center justify-center gap-4 text-xs md:text-sm">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 text-[11px] sm:text-xs md:text-sm">
                   <span className="px-3 py-1 rounded-full bg-stone-800 border border-stone-700">
-                    امتیاز درک قضایی: <strong className="text-amber-400 font-mono text-base">{result.justiceRating}/۱۰۰</strong>
+                    امتیاز درک قضایی: <strong className="text-amber-400 font-mono text-sm sm:text-base">{result.justiceRating}/۱۰۰</strong>
                   </span>
                   <span className="px-3 py-1 rounded-full bg-stone-800 border border-stone-700">
-                    وضعیت فریبکاری: <strong className={result.deceptionBusted ? 'text-emerald-400' : 'text-red-400'}>
+                    وضعیت: <strong className={result.deceptionBusted ? 'text-emerald-400' : 'text-red-400'}>
                       {result.deceptionBusted ? 'دسیسه متهم برملا شد' : 'متهم دادگاه را گمراه کرد'}
                     </strong>
                   </span>
@@ -284,60 +284,60 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
               </div>
 
               {/* Feedback Analysis */}
-              <div className="p-5 rounded-2xl bg-[#161826] border border-stone-800 space-y-2">
-                <h4 className="text-xs font-bold text-amber-400 flex items-center gap-2">
+              <div className="p-3.5 sm:p-5 rounded-2xl bg-[#161826] border border-stone-800 space-y-1.5 sm:space-y-2">
+                <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5 sm:gap-2">
                   <Award className="w-4 h-4 text-amber-400" />
                   تحلیل و ارزیابی دیوان عالی از استدلال قاضی:
                 </h4>
-                <p className="text-sm text-stone-200 leading-relaxed">
+                <p className="text-xs sm:text-sm text-stone-200 leading-relaxed">
                   {result.feedback}
                 </p>
               </div>
 
               {/* Hidden Truth Unveiled */}
-              <div className="p-5 rounded-2xl bg-amber-950/20 border border-amber-700/30 space-y-2">
-                <h4 className="text-xs font-bold text-amber-300 flex items-center gap-2">
+              <div className="p-3.5 sm:p-5 rounded-2xl bg-amber-950/20 border border-amber-700/30 space-y-1.5 sm:space-y-2">
+                <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5 sm:gap-2">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   پرده‌برداری از حقیقت کامل پرونده (آنچه در خفا رخ داده بود):
                 </h4>
-                <p className="text-sm text-amber-100/90 leading-relaxed whitespace-pre-line">
+                <p className="text-xs sm:text-sm text-amber-100/90 leading-relaxed whitespace-pre-line">
                   {result.truthRevealed}
                 </p>
               </div>
 
               {/* Culprit final confession if available */}
               {result.culpritConfession && (
-                <div className="p-4 rounded-xl bg-red-950/30 border border-red-600/30 text-red-200 text-xs leading-relaxed space-y-1">
+                <div className="p-3.5 sm:p-4 rounded-xl bg-red-950/30 border border-red-600/30 text-red-200 text-xs leading-relaxed space-y-1">
                   <span className="font-bold block text-red-400">واکنش و اعتراف نهایی مقصر در صحن دادگاه:</span>
                   <p className="italic font-serif">«{result.culpritConfession}»</p>
                 </div>
               )}
 
               {/* Epilogue */}
-              <div className="p-4 rounded-xl bg-[#141622] border border-stone-800 text-xs text-stone-400 leading-relaxed">
+              <div className="p-3 sm:p-4 rounded-xl bg-[#141622] border border-stone-800 text-xs text-stone-400 leading-relaxed">
                 <strong className="text-stone-300 block mb-1">سرانجام پس از اجرای حکم:</strong>
                 {result.epilogue}
               </div>
 
               {/* Footer Actions */}
-              <div className="pt-2 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       soundManager.playPaperRustle();
                       setShowVerdictSheet(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all cursor-pointer shadow"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all cursor-pointer shadow min-h-[42px]"
                   >
                     <Printer className="w-4 h-4 text-amber-400" />
-                    <span>مشاهده و چاپ دادنامه رسمی (با مهر دادگاه)</span>
+                    <span>مشاهده و چاپ دادنامه رسمی</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setResult(null)}
-                    className="px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-300 text-xs font-semibold transition-colors cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-stone-800 hover:bg-stone-750 text-stone-300 text-xs font-semibold transition-colors cursor-pointer text-center min-h-[42px]"
                   >
                     ویرایش و انشای مجدد رأی
                   </button>
@@ -349,7 +349,7 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
                     soundManager.playGavel();
                     onStartNewCase();
                   }}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-900 font-bold text-xs md:text-sm shadow-lg shadow-amber-900/40 transition-all cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-bold text-xs md:text-sm shadow-lg shadow-amber-900/40 transition-all cursor-pointer min-h-[42px]"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>بررسی پرونده جنایی بعدی</span>

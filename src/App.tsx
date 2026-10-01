@@ -9,7 +9,10 @@ import { VerdictModal } from './components/VerdictModal.tsx';
 import { ConsultationRoom } from './components/ConsultationRoom.tsx';
 import { MainMenu } from './components/MainMenu.tsx';
 import { DiagnosticsPanel } from './components/DiagnosticsPanel.tsx';
-import { Home, ArrowRight, Sparkles, Terminal } from 'lucide-react';
+import { GeminiModelTesterModal } from './components/GeminiModelTesterModal.tsx';
+import { PWAInstallButton } from './components/PWAInstallButton.tsx';
+import { OfflineIndicator } from './components/OfflineIndicator.tsx';
+import { Home, ArrowRight, Sparkles, Terminal, Activity } from 'lucide-react';
 
 export default function App() {
   // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session) | 'diagnostics' (system logs terminal)
@@ -28,6 +31,10 @@ export default function App() {
   
   const [selectedEvidenceToConfront, setSelectedEvidenceToConfront] = useState<EvidenceItem | null>(null);
   const [isVerdictModalOpen, setIsVerdictModalOpen] = useState(false);
+  const [isModelTesterOpen, setIsModelTesterOpen] = useState(false);
+  const [lastActiveModel, setLastActiveModel] = useState<string>('gemini-3.8-flash');
+  const [lastModelLatency, setLastModelLatency] = useState<number | undefined>(undefined);
+
   const [gavelAnimating, setGavelAnimating] = useState(false);
   const [isSoundOn, setIsSoundOn] = useState(true);
   const [isInterrogating, setIsInterrogating] = useState(false);
@@ -223,6 +230,13 @@ export default function App() {
 
       const data = await response.json();
 
+      if (data._activeModel) {
+        setLastActiveModel(data._activeModel);
+      }
+      if (data._latencyMs !== undefined) {
+        setLastModelLatency(data._latencyMs);
+      }
+
       // Find which character actually responded based on Gemini dynamic routing
       const responderId = data.addressedCharacterId || activeCharacterId || caseData.characters[0].id;
       const responderChar = caseData.characters.find((c) => c.id === responderId) || caseData.characters[0];
@@ -256,8 +270,11 @@ export default function App() {
         });
       }
 
-      // If slip-up detected, play dramatic chord
-      if (data.slipUp) {
+      // If confession or slip-up detected, play dramatic chord and boost stress
+      if (data.isConfession) {
+        soundManager.playDramaticSting();
+        setCharacterStressMap((prev) => ({ ...prev, [responderId]: 100 }));
+      } else if (data.slipUp) {
         soundManager.playDramaticSting();
       }
 
@@ -269,6 +286,7 @@ export default function App() {
         text: data.speech || 'جناب قاضی، پاسخ دیگری برای این ادعا ندارم.',
         innerThought: data.innerThought,
         slipUp: data.slipUp,
+        isConfession: !!data.isConfession,
         timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -352,8 +370,14 @@ export default function App() {
   };
 
   // When Case is confirmed and generated, go DIRECTLY to the courtroom!
-  const handleCaseCreatedAndEnterCourt = (newCase: CaseDossier) => {
+  const handleCaseCreatedAndEnterCourt = (newCase: CaseDossier & { _activeModel?: string; _latencyMs?: number }) => {
     setCaseData(newCase);
+    if (newCase._activeModel) {
+      setLastActiveModel(newCase._activeModel);
+    }
+    if (newCase._latencyMs !== undefined) {
+      setLastModelLatency(newCase._latencyMs);
+    }
     setCurrentTab('court'); // Direct entry to Courtroom as requested!
     setCurrentView('game');
     soundManager.playGavel();
@@ -374,6 +398,11 @@ export default function App() {
             soundManager.playPaperRustle();
             setCurrentView('diagnostics');
           }}
+          onOpenModelTester={() => {
+            soundManager.playPaperRustle();
+            setIsModelTesterOpen(true);
+          }}
+          activeModel={lastActiveModel}
         />
       )}
 
@@ -401,8 +430,11 @@ export default function App() {
               </div>
             </div>
 
-            <div className="text-[11px] text-stone-400 hidden md:block">
-              پس از توافق نهایی با جمینای، مستقیماً وارد صحن دادگاه خواهید شد.
+            <div className="flex items-center gap-3">
+              <PWAInstallButton />
+              <div className="text-[11px] text-stone-400 hidden lg:block">
+                پس از توافق نهایی با جمینای، مستقیماً وارد صحن دادگاه خواهید شد.
+              </div>
             </div>
           </header>
 
@@ -432,6 +464,11 @@ export default function App() {
             onReturnToMenu={() => {
               soundManager.playPaperRustle();
               setCurrentView('menu');
+            }}
+            activeModel={lastActiveModel}
+            onOpenModelTester={() => {
+              soundManager.playPaperRustle();
+              setIsModelTesterOpen(true);
             }}
           />
 
@@ -522,8 +559,11 @@ export default function App() {
                 <span>مرکز عیب‌یابی و مانیتورینگ زنده جمینای</span>
               </div>
             </div>
-            <div className="text-[11px] text-stone-500 hidden md:block">
-              کنترل یکپارچه پایداری شبکه و تحلیل پاسخ مدل‌های فلش ۳.۵ الی ۳.۸
+            <div className="flex items-center gap-3">
+              <PWAInstallButton />
+              <div className="text-[11px] text-stone-500 hidden lg:block">
+                کنترل یکپارچه پایداری شبکه و تحلیل پاسخ مدل‌های فلش ۳.۵ الی ۳.۸
+              </div>
             </div>
           </header>
 
@@ -532,6 +572,17 @@ export default function App() {
           </main>
         </div>
       )}
+
+      {/* 5. Live Gemini Model Tester & Connection Status Modal */}
+      <GeminiModelTesterModal
+        isOpen={isModelTesterOpen}
+        onClose={() => setIsModelTesterOpen(false)}
+        lastActiveModel={lastActiveModel}
+        lastModelLatency={lastModelLatency}
+      />
+
+      {/* 6. PWA Offline Connectivity Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

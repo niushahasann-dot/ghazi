@@ -47,6 +47,23 @@ export interface HiddenTruth {
   accomplices?: string;
 }
 
+export interface CaseHeaders {
+  caseClassification?: string;
+  investigationTitle?: string;
+  victimOrPartyLabel?: string;
+  briefingTitle?: string;
+  expertReportTitle?: string;
+  expertBadge?: string;
+  timeLabel?: string;
+  causeOrMethodLabel?: string;
+  analysisLabel?: string;
+  damagesOrInjuriesLabel?: string;
+  expertNoteLabel?: string;
+  evidenceSectionTitle?: string;
+  relationLabel?: string;
+  courtBranchTitle?: string;
+}
+
 export interface CaseDossier {
   id: string;
   caseNumber: string; // e.g. "۱۴۰۵/۸۲۹-ج"
@@ -61,6 +78,8 @@ export interface CaseDossier {
   evidence: EvidenceItem[];
   characters: Character[];
   hiddenTruth: HiddenTruth;
+  customHeaders?: CaseHeaders;
+  allowsLiveConfession?: boolean;
 }
 
 export interface InterrogationMessage {
@@ -74,6 +93,7 @@ export interface InterrogationMessage {
   evidencePresented?: EvidenceItem;
   stressDelta?: number;
   slipUp?: string;
+  isConfession?: boolean;
 }
 
 export interface VerdictResult {

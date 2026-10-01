@@ -38,33 +38,20 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
   const [showIndictmentSheet, setShowIndictmentSheet] = useState(false);
   const labels = getDynamicCaseLabels(caseData);
 
-  const getRoleBadge = (role: Character['role']) => {
-    switch (role) {
-      case 'defendant':
-        return 'bg-red-500/15 text-red-400 border-red-500/30';
-      case 'plaintiff':
-        return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-      case 'defense_lawyer':
-        return 'bg-blue-500/15 text-blue-300 border-blue-500/30';
-      case 'expert':
-        return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
-      default:
-        return 'bg-purple-500/15 text-purple-300 border-purple-500/30';
-    }
-  };
-
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-8 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       {/* Dossier Header Folder Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#181a24] via-[#141620] to-[#0f1017] border border-amber-900/30 p-6 md:p-8 shadow-2xl">
+      <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#181a24] via-[#141620] to-[#0f1017] border border-amber-900/30 p-4 sm:p-6 md:p-8 shadow-2xl">
         <div className="absolute -top-12 -left-12 w-48 h-48 bg-amber-600/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-4 left-6 border-2 border-red-700/50 bg-red-950/20 text-red-400 px-4 py-1.5 rounded-lg text-xs md:text-sm font-bold tracking-widest uppercase -rotate-2 select-none shadow">
+        
+        {/* Classification Badge */}
+        <div className="mb-3 sm:mb-0 sm:absolute sm:top-4 sm:left-6 border border-red-700/50 bg-red-950/40 text-red-400 px-3 py-1 rounded-lg text-[11px] sm:text-xs md:text-sm font-bold tracking-wider uppercase sm:-rotate-2 select-none shadow inline-block">
           {labels.caseClassification}
         </div>
 
         <div className="max-w-3xl space-y-3">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-full overflow-hidden border border-amber-500/40 shadow-lg shadow-amber-950/60 bg-stone-900 shrink-0">
+          <div className="flex items-center gap-3 sm:gap-3.5">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden border border-amber-500/40 shadow-lg shadow-amber-950/60 bg-stone-900 shrink-0">
               <img
                 src="/images/court_gavel_logo.jpg"
                 alt="مهر رسمی پرونده"
@@ -72,47 +59,47 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
                 className="w-full h-full object-cover scale-[1.15]"
               />
             </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-amber-400">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs font-mono text-amber-400">
                 <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
                   کلاسه: {caseData.caseNumber}
                 </span>
                 <span className="text-stone-500">•</span>
                 <span className="text-stone-300">{caseData.genre}</span>
               </div>
-              <h2 className="text-xl md:text-3xl font-extrabold text-amber-100 tracking-tight mt-1">
+              <h2 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-amber-100 tracking-tight mt-1 truncate sm:whitespace-normal">
                 {caseData.title}
               </h2>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 text-xs md:text-sm text-stone-400 pt-1">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] sm:text-xs md:text-sm text-stone-400 pt-1">
             <div className="flex items-center gap-1.5 text-stone-300">
-              <Clock className="w-4 h-4 text-amber-500/80" />
-              <span>زمان وقوع: {caseData.incidentDate}</span>
+              <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500/80" />
+              <span>زمان: {caseData.incidentDate}</span>
             </div>
             <div className="flex items-center gap-1.5 text-stone-300">
-              <MapPin className="w-4 h-4 text-amber-500/80" />
-              <span>محل وقوع: {caseData.location}</span>
+              <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500/80" />
+              <span>محل: {caseData.location}</span>
             </div>
           </div>
         </div>
 
         {/* Action quick buttons */}
-        <div className="mt-6 pt-5 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-5 sm:mt-6 pt-4 sm:pt-5 border-t border-stone-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
                 soundManager.playPaperRustle();
                 setShowIndictmentSheet(true);
               }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 text-amber-200 text-xs font-bold border border-amber-600/40 transition-colors cursor-pointer shadow"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-950/40 hover:bg-amber-900/50 text-amber-200 text-xs font-bold border border-amber-600/40 transition-colors cursor-pointer shadow min-h-[42px]"
             >
-              <FileCheck2 className="w-4 h-4 text-amber-400" />
-              <span>مشاهده کیفرخواست رسمی دادسرا (مهر شده)</span>
+              <FileCheck2 className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>مشاهده کیفرخواست رسمی دادسرا</span>
             </button>
             <p className="text-xs text-stone-400 hidden lg:block">
-              کلیه مدارک و گزارش کالبدشکافی را بررسی و سپس اشخاص را برای بازجویی احضار کنید.
+              کلیه مدارک و گزارش‌ها را بررسی و سپس اشخاص را برای بازجویی احضار کنید.
             </p>
           </div>
 
@@ -121,9 +108,9 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
               soundManager.playGavel();
               onOpenVerdictModal();
             }}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 text-stone-100 text-xs md:text-sm font-bold shadow-lg shadow-red-950/40 border border-red-500/30 transition-all cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 text-stone-100 text-xs md:text-sm font-bold shadow-lg shadow-red-950/40 border border-red-500/30 transition-all cursor-pointer min-h-[42px]"
           >
-            <Scale className="w-4 h-4" />
+            <Scale className="w-4 h-4 shrink-0" />
             <span>آماده صدور حکم نهایی هستم</span>
           </button>
         </div>
@@ -221,7 +208,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
               <div className="flex items-center justify-between border-b border-stone-800 pb-3">
                 <div className="flex items-center gap-2 text-amber-400 font-bold text-base">
                   <Search className="w-5 h-5 text-amber-400" />
-                  <h3>شواهد و مدارک ضبط‌شده ({caseData.evidence.length})</h3>
+                  <h3>{labels.evidenceSectionTitle} ({caseData.evidence.length})</h3>
                 </div>
                 <span className="text-xs text-stone-400">بررسی جزئیات</span>
               </div>
@@ -295,13 +282,12 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
                     <span className="text-base font-extrabold text-stone-100 block group-hover:text-amber-200 transition-colors truncate">{char.name}</span>
                     <span className="text-xs text-stone-400 font-mono">({char.age} ساله)</span>
                   </div>
-                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border shrink-0 ${getRoleBadge(char.role)}`}>
-                    {char.roleTitle}
+                  <span className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-stone-750 bg-stone-800/80 text-stone-300 shrink-0">
+                    {char.occupation}
                   </span>
                 </div>
 
                 <div className="space-y-1 text-xs text-stone-300 bg-[#10121d] p-3 rounded-xl border border-stone-850">
-                  <p className="truncate"><strong className="text-stone-400">شغل:</strong> {char.occupation}</p>
                   <p className="truncate"><strong className="text-stone-400">{labels.relationLabel}</strong> {char.relationToVictim}</p>
                   <p className="truncate">
                     <strong className="text-stone-400">مزاج و روحیات:</strong>{' '}

@@ -15,6 +15,7 @@ const __dirname = path.dirname(__filename);
 
 // Multi-model pools for balanced workload distribution & zero-stall 503 recovery
 const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+export const ALL_AVAILABLE_MODELS = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 export const MODEL_TIER_MAIN = [PRIMARY_MODEL, 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
 export const MODEL_TIER_FAST_LITE = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
 
@@ -108,6 +109,8 @@ async function generateAiContent(
 
   addSystemLog('info', 'GeminiAPI', `ارسال درخواست به استخر هوشمند مدل‌ها (${modelPool.join(' ⮞ ')})`);
 
+  const startTime = Date.now();
+
   for (const modelCandidate of modelPool) {
     if (triedModels.has(modelCandidate)) continue;
     triedModels.add(modelCandidate);
@@ -131,11 +134,13 @@ async function generateAiContent(
         });
 
         if (response && response.text) {
-          addSystemLog('success', 'GeminiAPI', `پاسخ موفق از مدل [${modelCandidate}] (تلاش ${attempt})`, {
+          const latencyMs = Date.now() - startTime;
+          addSystemLog('success', 'GeminiAPI', `پاسخ موفق از مدل [${modelCandidate}] (تلاش ${attempt}) در ${latencyMs}ms`, {
             characterCount: response.text.length,
+            latencyMs,
             preview: response.text.substring(0, 120) + '...'
           });
-          return { text: response.text, usedModel: modelCandidate };
+          return { text: response.text, usedModel: modelCandidate, latencyMs };
         }
       } catch (err: any) {
         const errMsg = err?.message || String(err);
@@ -530,6 +535,7 @@ function generateProceduralCase(topic: string): CaseDossier {
       howCrimeHappened: 'متهم ردیف اول وارد دفتر کار مقتول شده، اسناد جعل‌شده را قرار داده و با تنفس ماده سمی مقتول را به قتل رسانده است.',
       keyContradiction: 'تناقض فاحش الایبی متهم با ردیابی آنتن دکل مخابراتی و اسناد جعل‌شده در کیف وی.',
     },
+    allowsLiveConfession: Math.random() < 0.15,
   };
 }
 
@@ -652,6 +658,66 @@ async function startServer() {
     res.json(PRESET_CASES);
   });
 
+  // Individual Gemini Model Connectivity & Latency Ping Endpoint
+  app.post('/api/ping-model', async (req: Request, res: Response) => {
+    const { modelName } = req.body;
+    const targetModel = modelName || PRIMARY_MODEL;
+
+    if (!ai) {
+      return res.json({
+        success: false,
+        modelName: targetModel,
+        latencyMs: 0,
+        error: 'کلید API تنظیم نشده است (حالت آفلاین)',
+      });
+    }
+
+    const startTime = Date.now();
+    try {
+      addSystemLog('info', 'ModelTester', `تست مستقیم پینگ نسخه [${targetModel}]`);
+      const isLite = targetModel.includes('lite');
+      const response = await ai.models.generateContent({
+        model: targetModel,
+        contents: 'سلام. فقط کلمه "وصل" را برگردان.',
+        config: {
+          temperature: 0.1,
+          maxOutputTokens: 10,
+          thinkingConfig: { thinkingLevel: isLite ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW },
+        },
+      });
+
+      const latencyMs = Date.now() - startTime;
+      const text = response?.text?.trim() || 'وصل';
+      addSystemLog('success', 'ModelTester', `پینگ نسخه [${targetModel}] موفق بود (${latencyMs}ms): "${text}"`);
+      return res.json({
+        success: true,
+        modelName: targetModel,
+        latencyMs,
+        responseText: text,
+      });
+    } catch (err: any) {
+      const latencyMs = Date.now() - startTime;
+      const errMsg = err?.message || String(err);
+      const status = err?.status || err?.statusCode || 'Error';
+      addSystemLog('error', 'ModelTester', `خطا در پینگ مدل [${targetModel}] (${latencyMs}ms): کد ${status} - ${errMsg}`, err);
+      return res.json({
+        success: false,
+        modelName: targetModel,
+        latencyMs,
+        error: `کد خطا ${status}: ${errMsg}`,
+      });
+    }
+  });
+
+  // Get list of all available Gemini model tiers
+  app.get('/api/models-info', (_req: Request, res: Response) => {
+    res.json({
+      primaryModel: PRIMARY_MODEL,
+      models: ALL_AVAILABLE_MODELS,
+      hasApiKey: !!ai,
+    });
+  });
+
   // Generate Complete Case Dossier based directly on topic/keyword
   app.post('/api/generate-case', async (req: Request, res: Response) => {
     const { customIdea, topicText } = req.body;
@@ -666,7 +732,13 @@ async function startServer() {
       const prompt = `شما داستان‌نویس و طراح ارشد پرونده‌های قضایی برای بازی کارآگاهی و قضاوت «آقای قاضی» هستید.
 موضوع کلی پرونده که کاربر درخواست کرده است: "${requestedTopic}"
 
-دستورالعمل‌های بسیار مهم و حیاتی سبک پرونده:
+قانون حیاتی و طلایی معمایی ۵۰/۵۰ (بسیار مهم):
+۱. **توزیع کاملاً تصادفی و ۵۰ درصدی حقیقت جرم**:
+   - در **۵۰٪ پرونده‌ها**: متهم ردیف اول واقعاً گناهکار و مجرم اصلی است و تلاش می‌کند با فریب و الایبی دروغین از زیر بار مجازات فرار کند.
+   - در **۵۰٪ دیگر پرونده‌ها**: متهم ردیف اول **کاملاً بی‌گناه و پاک** است (قربانی یک پاپوش‌دوزی حرفه‌ای، شواهد ظاهری گمراه‌کننده، یا توطئه خانوادگی/کاری شده است). در این حالت، **مجرم واقعی یکی دیگر از افراد حاضر در دادگاه (مانند شاهد کلیدی، شریک مالی، یکی از بستگان یا ورثه، یا حتی خود شاکی که برای کلاهبرداری بیمه یا انتقام‌جویی صحنه‌سازی کرده)** می‌باشد!
+   - توجه: کارآگاه یا پزشک قانونی همیشه بی‌طرف هستند؛ اما شهود، شاکیان، و افراد نزدیک به مقتول/مال‌باخته می‌توانند مقصر اصلی و فریبکار واقعی باشند.
+
+دستورالعمل‌های سبک و ژانر پرونده:
 پرونده می‌تواند در یکی از دسته‌بندی‌های زیر طراحی شود (با توجه به موضوع درخواستی "${requestedTopic}"):
 ۱. **جنایی (Murder / Assault)**: قتل، ضرب و شتم، جنایات فیزیکی.
 ۲. **مالی و تجاری (Financial Fraud / Embezzlement)**: کلاهبرداری هرمی، اختلاس، پول‌شویی، جعل اسناد ملکی، سرقت مالکیت معنوی، خیانت در امانت شرکا.
@@ -674,7 +746,7 @@ async function startServer() {
 
 ادبیات واقعی داستان‌نویسی قضایی:
 - به هیچ عنوان عبارت خام درخواستی یا کلمات مصنوعی مانند "موضوع درخواستی" یا "پرونده ویژه موضوع..." را در متن، عناوین، سمت کاراکترها یا دیالوگ‌ها تکرار نکنید!
-- یک عنوان جذاب و طبیعی خلق کنید (مثال برای مالی: "پرونده اختلاس صندوق بازنشستگی زرین" یا خانوادگی: "ماترک موروثی خاندان سالار").
+- یک عنوان جذاب و داستانی خلق کنید (مثال برای مالی: "پرونده اختلاس صندوق بازنشستگی زرین" یا خانوادگی: "ماترک موروثی خاندان سالار").
 - تمام اسامی، مشاغل، محل وقوع جرم، گزارش ارزیابی و مدارک باید مانند یک پرونده واقعی قضایی با داستان‌نویسی روان و مهیج فارسی نگاشته شوند.
 
 انعطاف در ساختار گزارش تخصصی (autopsyReport):
@@ -693,37 +765,67 @@ async function startServer() {
    - "injuries": ["سند پلاک ثبتی مورد اختلاف", "میزان مهریه یا سهم‌الارث مورد مناقشه"].
    - "coronerNotes": گزارش رسمی مددکار خانواده یا نظریه کارشناس رسمی خط‌شناسی دادگستری.
 
-تعداد اشخاص (بین ۳ تا ۹ نفر):
-- متهم ردیف اول (defendant): با استراتژی دروغین (deceptionStrategy) و الایبی محکم اما دارای تناقض.
-- سایر کاراکترها شامل شاکی یا مدعی‌العموم (plaintiff)، کارشناس رسمی یا مأمور پرونده (expert)، و شهود دیگر (witness).
+قانون مهم: آزادی کامل و مطلق هوش مصنوعی در ساخت کاراکترها و اشخاص پرونده:
+دست شما به عنوان هوش مصنوعی در تعداد و تنوع اشخاص پرونده کاملاً باز و آزاد است و باید دقیقاً متناسب با ماهیت، سوژه و سطح پیچیدگی موضوع درخواستی اشخاص مرتبط را بسازید:
+- اگر موضوع پرونده ساده و جمع‌وجور است: ۲ الی ۳ شخص کافی است (مثلاً متهم اصلی و شاکی یا شاهد).
+- اگر موضوع پرونده پیچیده، تیمی، شرکتی، اختلاس، خانوادگی، پزشکی، سرقت باندی یا جنایت چندبعدی است: حتماً افراد بیشتری (بین ۳ تا ۶ یا حتی ۷ نفر) تولید کنید تا دادگاه شلوغ، پر از سوءظن و مهیج باشد.
+- کلیه اشخاص باید مستقیماً با موضوع در ارتباط باشند. نقش‌ها (role) شامل:
+  * "defendant" (متهم ردیف اول، متهم ردیف دوم، همدست، مباشر یا مجرم مظنون)
+  * "plaintiff" (شاکی پرونده، مالباخته، ولی‌دم یا مدعی حق)
+  * "witness" (شاهد عینی، نگهبان، کارمند، همسایه، بستگان، راننده یا فرد مطلع)
+  * "expert" (کارشناس رسمی دادگستری، حسابرس، پزشک قانونی، بازرس یا کارآگاه)
+  * "defense_lawyer" (وکیل مدافع یا مشاور حقوقی)
+- برای هر شخص آیدی مجزا مثل "char-1", "char-2", "char-3", ... بگذارید.
+- اگر متهم اول بی‌گناه است، مجرم واقعی یکی دیگر از کاراکترهاست و فیلد isLying برای آن شخص true و deceptionStrategy وی توضیح داده شود.
 
-مدارک و حقیقت پنهان:
-- ۴ تا ۶ مدرک فیزیکی، دیجیتالی یا اسناد رسمی متناسب با ژانر پرونده.
-- حقیقت پنهان (hiddenTruth) شامل مقصر واقعی، انگیزه واقعی و کلید تناقضی که دروغ متهم را لو می‌دهد.
+مدارک و شواهد:
+- بین ۳ الی ۶ مدرک مستدل، فیزیکی، دیجیتالی یا اسناد رسمی متناسب با موضوع.
+
+طراحی اختصاصی و صد در صد داینامیک سرتیترها توسط هوش مصنوعی (customHeaders):
+سرتیترها، عناوین و برچسب‌های پرونده باید کاملاً توسط شما بر اساس ژانر و موضوع واقعی طراحی شوند تا هیچ عبارت نامربوط یا نامتناسبی نمایش داده نشود:
+- اگر قتل یا جنایی است: victimOrPartyLabel باید «مقتول و قربانی جنایت:» باشد، expertReportTitle باید «گزارش کالبدشکافی و سم‌شناسی پزشکی قانونی»، timeLabel «زمان تقریبی فوت:»، causeOrMethodLabel «علت تامه فوت:»، damagesOrInjuriesLabel «آثار جراحات و ضرب و جرح بر جسد:»، evidenceSectionTitle «شواهد مادی و آزمایشگاهی صحنه جرم»، courtBranchTitle «دادگاه کیفری یک استان (ویژه قتل)».
+- اگر مالی، اختلاس، سرقت یا کلاهبرداری است: victimOrPartyLabel باید «شاکی پرونده و مال‌باخته:»، expertReportTitle «گزارش حسابرسی رسمی و بازرسی مالی»، timeLabel «زمان اولین تراکنش مشکوک یا وقوع سرقت:»، causeOrMethodLabel «شگرد اختلاس و خروج پول:»، damagesOrInjuriesLabel «مبالغ مفقوده و کسری حساب‌ها:»، evidenceSectionTitle «اسناد بانکی، فاکتورها و چک‌های مکشوفه»، courtBranchTitle «دادگاه ویژه رسیدگی به جرایم اقتصادی».
+- اگر خانوادگی، وصیت‌نامه یا ارث است: victimOrPartyLabel «خواهان پرونده / متوفی ماترک:»، expertReportTitle «گزارش کارشناسی خط‌شناسی و اصالت اسناد»، courtBranchTitle «دادگاه حقوقی و امور حسبی».
 
 خروجی صرفاً یک ساختار معتبر JSON با کلیدهای زیر باشد (بدون هیچ متن اضافی قبل یا بعد از JSON):
 
 {
   "id": "case-${Date.now()}",
   "caseNumber": "۱۴۰۵/...-ج",
-  "title": "عنوان جذاب و داستانی پرونده (مثلاً: سایه جعل در وصیت‌نامه عمارت اقدسیه)",
+  "title": "عنوان جذاب و داستانی پرونده",
   "genre": "ژانر پرونده (مثلاً: مالی - کلاهبرداری، خانوادگی - انحصار وراثت، جنایی - قتل)",
   "incidentDate": "تاریخ و ساعت وقوع یا کشف تخلف",
   "location": "مکان وقوع جرم یا محل ثبت اسناد",
   "victimName": "نام کامل شاکی پرونده، مقتول، یا صاحب اصلی اموال مفقوده",
   "victimBackground": "پیشینه، روابط و وضعیت شاکی یا قربانی اصلی",
   "briefing": "گزارش مشروح، جذاب و داستانی صحنه جرم یا خلاصه ماجرای کلاهبرداری/اختلاف خانوادگی جهت مطالعه اولیه قاضی",
+  "customHeaders": {
+    "caseClassification": "طبقه بندی محرمانه متناسب با ژانر",
+    "investigationTitle": "عنوان گزارش ضابطین یا بازپرس ویژه",
+    "victimOrPartyLabel": "برچسب مقتول / شاکی / مالباخته (دقیقاً منطبق بر داستان)",
+    "briefingTitle": "عنوان شرح واقعه و گردش‌کار",
+    "expertReportTitle": "عنوان گزارش کالبدشکافی یا حسابرسی",
+    "expertBadge": "نشان تخصصی",
+    "timeLabel": "برچسب زمان وقوع جرم یا فوت",
+    "causeOrMethodLabel": "برچسب علت فوت یا شگرد کلاهبرداری",
+    "analysisLabel": "برچسب نتایج سم‌شناسی یا ردیابی حساب",
+    "damagesOrInjuriesLabel": "برچسب جراحات جسد یا اموال مسروقه",
+    "expertNoteLabel": "برچسب نکته کلیدی پزشک قانونی یا حسابرس",
+    "evidenceSectionTitle": "عنوان بخش مدارک و اسناد",
+    "relationLabel": "برچسب نسبت با مقتول یا شاکی",
+    "courtBranchTitle": "نام شعبه تخصصی دادگاه"
+  },
   "autopsyReport": {
     "timeOfDeath": "زمان ردیابی تخلف اولیه / زمان فوت",
     "causeOfDeath": "علت فوت / شگرد کلاهبرداری / ریشه اختلاف خانوادگی",
     "toxicology": "نتایج سم‌شناسی / ردیابی حساب‌های مقصد / اصالت‌سنجی دست‌خط وصیت‌نامه",
     "injuries": ["مورد ۱", "مورد ۲"],
-    "coronerNotes": "نکات کلیدی گزارش کارشناس رسمی دادگستری یا پزشکی قانونی که تناقض ادعای متهم را نشان می‌دهد"
+    "coronerNotes": "نکات کلیدی گزارش کارشناس رسمی دادگستری یا پزشکی قانونی که تناقض را نشان می‌دهد"
   },
   "evidence": [
     {
       "id": "ev-1",
-      "title": "نام مدرک داستانی (مانند فاکتور خرید جعلی، پرینت تراکنش‌های بانکی، وصیت‌نامه، اثر انگشت)",
+      "title": "نام مدرک داستانی",
       "type": "physical",
       "description": "شرح مدرک",
       "foundAt": "محل کشف مدرک یا نحوه استخراج سند",
@@ -734,32 +836,72 @@ async function startServer() {
   "characters": [
     {
       "id": "char-1",
-      "name": "نام و فامیلی کامل شخص",
+      "name": "نام و فامیلی شخص اول",
       "role": "defendant",
-      "roleTitle": "سمت در دادگاه (مثلا متهم ردیف اول - برادرزاده متوفی، یا شريک تجاری سابق)",
+      "roleTitle": "متهم ردیف اول - ...",
       "age": 38,
-      "occupation": "شغل کامل شخص",
-      "relationToVictim": "نسبت یا ارتباط با شاکی/قربانی/متوفی",
-      "personality": "شخصیت و روانشناسی کاراکتر",
+      "occupation": "شغل دقیق",
+      "relationToVictim": "نسبت یا ارتباط با شاکی/قربانی",
+      "personality": "روانشناسی کاراکتر",
       "initialStatement": "اظهارات اولیه طبیعی در صحن دادگاه",
       "suspicionLevel": 75,
       "isLying": true,
-      "deceptionStrategy": "دروغ و ترفند متهم برای انحراف قاضی",
-      "vulnerabilities": ["تناقض یا مدرکی که دروغش را لو می‌دهد"]
+      "deceptionStrategy": "استراتژی دفاعی یا پنهان‌کاری",
+      "vulnerabilities": ["تناقض در اظهارات با مدارک"]
+    },
+    {
+      "id": "char-2",
+      "name": "نام و فامیلی شخص دوم",
+      "role": "plaintiff",
+      "roleTitle": "شاکی / ولی‌دم / متضرر پرونده",
+      "age": 42,
+      "occupation": "شغل دقیق",
+      "relationToVictim": "نسبت مستقیم",
+      "personality": "روحیات و رفتار",
+      "initialStatement": "ادعاها و شکایت در محضر قاضی",
+      "suspicionLevel": 20,
+      "isLying": false,
+      "deceptionStrategy": "ارائه مدارک و تقاضای دادرسی",
+      "vulnerabilities": []
+    },
+    {
+      "id": "char-3",
+      "name": "نام و فامیلی شخص سوم (در صورت نیاز به تناسب موضوع)",
+      "role": "witness",
+      "roleTitle": "شاهد کلیدی / شریک / حسابدار / مطلع",
+      "age": 35,
+      "occupation": "شغل دقیق",
+      "relationToVictim": "رابطه کاری یا خانوادگی",
+      "personality": "روانشناسی",
+      "initialStatement": "شهادت اولیه در دادگاه",
+      "suspicionLevel": 45,
+      "isLying": false,
+      "deceptionStrategy": "",
+      "vulnerabilities": []
     }
   ],
   "hiddenTruth": {
     "realCulpritId": "char-1",
     "realCulpritName": "نام مقصر واقعی",
-    "motive": "انگیزه واقعی جرم (مثلاً زیاده‌خواهی در سهم‌الارث یا تسویه بدهی‌های قمار)",
+    "motive": "انگیزه واقعی جرم",
     "howCrimeHappened": "شرح واقعی چگونگی وقوع تخلف یا جرم به ترتیب ساعت و تاریخ",
-    "keyContradiction": "تناقض اساسی که قاضی باید از تطبیق مدارک مالی/جنایی کشف کند"
+    "keyContradiction": "تناقض اساسی که قاضی باید از تطبیق مدارک کشف کند"
   }
 }`;
 
-      const resAi = await generateAiContent(prompt, true, 0.85, 2500);
+      // Giving AI plenty of tokens (5500) so it never curtails characters or details
+      const resAi = await generateAiContent(prompt, true, 0.85, 5500);
       const parsedCase = parseJsonFromAi<CaseDossier>(resAi.text);
-      res.json(parsedCase);
+      
+      // Strictly enforce 15% probability for live courtroom confession
+      const allowsLiveConfession = Math.random() < 0.15;
+
+      res.json({
+        ...parsedCase,
+        allowsLiveConfession,
+        _activeModel: resAi.usedModel,
+        _latencyMs: resAi.latencyMs,
+      });
     } catch (error) {
       console.error('Error generating case via Gemini:', error);
       const bespokeCase = generateProceduralCase(requestedTopic);
@@ -812,7 +954,11 @@ ${caseData.title} | ${caseData.briefing}
       // Generate heated argument using the ultra-fast, token-saving LITE model pool
       const resAi = await generateAiContent(prompt, true, 0.9, 800, MODEL_TIER_FAST_LITE);
       const argument = parseJsonFromAi<unknown>(resAi.text);
-      res.json({ argument });
+      res.json({
+        argument,
+        _activeModel: resAi.usedModel,
+        _latencyMs: resAi.latencyMs,
+      });
     } catch (error) {
       console.error('Error generating heated argument:', error);
       const c1 = caseData?.characters?.[0] || { name: 'متهم اول' };
@@ -847,8 +993,8 @@ ${caseData.title} | ${caseData.briefing}
         addressedCharacterId: char.id,
         addressedCharacterName: char.name,
         speech: isDef
-          ? `جناب قاضی، بنده (${char.name}) بارها عرض کرده‌ام که در زمان وقوع حادثه، هیچ نقشی در این جنایت نداشتم!`
-          : `ریاست محترم دادگاه، بنده به عنوان ${char.roleTitle} آنچه دیدم و شنیدم را صادقانه بیان کردم.`,
+          ? `جناب قاضی، بنده (${char.name}) بارها عرض کرده‌ام که در زمان وقوع حادثه، هیچ نقشی در این ماجرا نداشتم!`
+          : `ریاست محترم دادگاه، بنده آنچه دیدم و شنیدم را با صداقت در محضر شما بیان کردم.`,
         innerThought: isDef ? 'باید خونسرد بمانم...' : undefined,
         slipUp: evidence ? `تناقض در خصوص مکان و چگونگی کشف ${evidence.title}` : undefined,
         stressDelta: evidence ? 18 : 6,
@@ -857,6 +1003,14 @@ ${caseData.title} | ${caseData.briefing}
     }
 
     try {
+      // Determine if this specific case belongs to the rare 15% where live confession is possible
+      const caseIdStr = String(caseData?.id || '');
+      let hash = 0;
+      for (let i = 0; i < caseIdStr.length; i++) {
+        hash = (hash + caseIdStr.charCodeAt(i)) % 100;
+      }
+      const canConfessLive = caseData?.allowsLiveConfession !== undefined ? Boolean(caseData.allowsLiveConfession) : (hash < 15);
+
       // Smart token reduction: keep only the last 8 recent dialogue exchanges
       const recentHistory = (history || []).slice(-8);
       const historyStr = recentHistory
@@ -866,6 +1020,11 @@ ${caseData.title} | ${caseData.briefing}
       const allCharsDescription = charsList
         .map((c: Character) => `ID: "${c.id}" | نام کامل: "${c.name}" | سمت: "${c.roleTitle}" | سن: ${c.age} | شغل: "${c.occupation}" | رابطه با قربانی: "${c.relationToVictim}" | روحیات: "${c.personality}" | وضعیت اخلاقی: "${c.temperament || 'normal'}" | استراتژی فریب: "${c.deceptionStrategy || 'ندارد'}" | نقاط ضعف: "${(c.vulnerabilities || []).join(', ')}"`)
         .join('\n\n');
+
+      const confessionRuleText = canConfessLive
+        ? `این پرونده استثنائاً جزو «۱۵٪ پرونده‌های خاص» است که مقصر دارای ضعف شخصیتی یا شکنندگی روانی است. اگر و تنها اگر قاضی مدرک کلیدی و ابطال‌ناپذیر پرونده را مستقیماً رو کرد و او را در بن‌بست کامل قرار داد، می‌تواند دچار فروپاشی روانی شده و اعتراف صریح کند (isConfession: true).`
+        : `قانون قطعی و لازم‌الاجرا در این پرونده (۸۵٪ پرونده‌ها): **عدم امکان هرگونه اعتراف زنده در صحن دادگاه!**
+مقصر در این پرونده فردی به شدت سرسخت، مغرور یا دارای وکیل و پنهان‌کار است. تحت هیچ شرایطی در طول بازجویی اعتراف صریح نمی‌کند و مقدار "isConfession" باید ۱۰۰٪ false باشد. او فقط در صورت بن‌بست دچار لغزش کلامی و تپق ریز در فیلد "slipUp" می‌شود یا با عصبانیت سکوت و انکار می‌کند تا قاضی خودش بر اساس شواهد رأی نهایی را انشا کند.`;
 
       const prompt = `شما کارگردان و هوش مصنوعی هماهنگ‌کننده کل سالن دادگاه تخصصی بازی «آقای قاضی» هستید.
 قاضی (کاربر) در صحن علنی دادگاه، سوال یا مدرکی را مطرح کرده است. شما باید شخصیت مخاطب را تشخیص دهید و دیالوگی فوق‌العاده باهوش، واقع‌گرایانه، طبیعی و دقیقاً منطبق با موضوع پرونده برای او خلق کنید.
@@ -879,7 +1038,7 @@ ${caseData.briefing}
 ${caseData.hiddenTruth?.howCrimeHappened || ''}
 تناقض کلیدی پرونده: ${caseData.hiddenTruth?.keyContradiction || ''}
 
-سابقه جریان دادگاه زنده (همه حرف‌های قبلی):
+سابقه‌ی جریان دادگاه زنده:
 ${historyStr}
 
 سوال یا مواجهه جدید قاضی:
@@ -890,11 +1049,13 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
 ۱. **هوشمندی بالا و پرهیز از سوتی‌های بچه‌گانه (High Intelligence & Realistic Defense)**:
    - کاراکترها انسان‌های بالغ، زیرک، محتاط و زبان‌باز هستند. تحت هیچ شرایطی سوتی‌های مضحک، اعتراف‌های پیش‌پاافتاده یا کودکانه نمی‌دهند.
    - متهمین دروغ‌های باورپذیر می‌بافند، توجیه منطقی برای اعمال خود می‌آورند و تقصیر را هوشمندانه گردن دیگران یا شرایط می‌اندازند.
+   - اگر متهم اصلی بی‌گناه است، با اعتماد به نفس و آشفتگی از این پاپوش دفاع می‌کند؛ اگر مجرم واقعی شخص دیگری است (مثلاً شاهدی که دروغ می‌گوید)، آن شخص سعی می‌کند با خونسردی یا مظلوم‌نمایی شک را متوجه متهم نگه دارد.
 
-۲. **سوتی‌های بسیار نادر، محدود و فوق‌العاده ظریف (Subtle & Rare Slip-Ups)**:
-   - در ۸۵٪ تا ۹۰٪ مکالمات عادی، مقدار فیلد "slipUp" باید دقیقاً **null** باشد.
-   - شخصیت فقط و فقط زمانی دچار تپق یا تناقض ظریف می‌شود که قاضی یک «مدرک قطعی و انکارناپذیر» را مستقیماً در برابرش قرار دهد یا او را در یک بن‌بست زمانی/منطقی شدید گیر بیندازد.
-   - حتی در زمان تناقض، سوتی باید خیلی ریز و واقع‌بینانه باشد (مثلاً یک تناقض کوچک در ساعت حضور، لو رفتن غیرعمدی یک جزئیات کوچک که ادعا می‌کرد از آن بی‌خبر است) نه اعتراف صریح.
+۲. **قانون اعتراف، لغزش‌های کلامی و فروپاشی روانی (Breakdown & Confession)**:
+   - در مکالمات عادی و استنطاق‌های معمولی: کاراکتر به هیچ وجه اعتراف نمی‌کند، انکار می‌کند و مقدار "isConfession" باید false و "slipUp" باید null باشد.
+   - **قانون خاص این پرونده درباره اعتراف زنده**:
+     ${confessionRuleText}
+   - اگر شخص بی‌گناه است: حتی زیر شدیدترین اتهامات و فشارها، هرگز اعتراف دروغین نمی‌کند؛ بلکه با بغض، فریاد، یا سوگند به بی‌گناهی خود و توطئه‌بودن اتهامات اشاره می‌کند.
 
 ۳. **تطابق ۱۰۰٪ با موضوع و مدارک پرونده**:
    - تمامی صحبت‌ها، دفاعیات و ارجاعات باید دقیقاً بر اساس حقایق همین پرونده («${caseData.title}») باشد (مثلاً ارقام چک‌ها، قراردادها، امضاها، مبالغ، ساعات، نسبت‌ها یا گزارش‌های کارشناسی).
@@ -910,11 +1071,12 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
 {
   "addressedCharacterId": "آیدی دقیق کاراکتر پاسخ‌دهنده",
   "addressedCharacterName": "نام دقیق کاراکتر پاسخ‌دهنده",
-  "speech": "پاسخ رسا، هوشمندانه، مستدل و واقع‌گرایانه کاراکتر پاسخ‌دهنده",
+  "speech": "پاسخ رسا، هوشمندانه، مستدل و واقع‌گرایانه کاراکتر پاسخ‌دهنده (یا دیالوگ اعتراف در صورت فروپاشی)",
   "innerThought": "مونولوگ درونی، محاسبه‌گری یا استرس پنهان کاراکتر در مغز خود",
   "slipUp": "فقط در صورتی که قاضی با مدرک قطعی او را گیر انداخت تناقض ریز را بنویسید، در غیر این صورت null",
+  "isConfession": false,
   "stressDelta": 10,
-  "lawyerIntervention": "متن اعتراض حقوقی وکیل مدافع در صورت لزوم، در غیر این صورت null",
+  "lawyerIntervention": "متن اعتراض حقوقی در صورت لزوم، در غیر این صورت null",
   "interruption": {
     "interrupterId": "آیدی کاراکتر معترض",
     "interrupterName": "نام کاراکتر معترض",
@@ -925,7 +1087,17 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
 
       const resAi = await generateAiContent(prompt, true, 0.85, 2000);
       const parsed = parseJsonFromAi<Record<string, any>>(resAi.text);
-      res.json(parsed);
+
+      // Hard enforcement: if this case does NOT permit live confession, ensure isConfession is strictly false!
+      if (!canConfessLive) {
+        parsed.isConfession = false;
+      }
+
+      res.json({
+        ...parsed,
+        _activeModel: resAi.usedModel,
+        _latencyMs: resAi.latencyMs,
+      });
     } catch (error) {
       addSystemLog('error', 'InterrogateAPI', `خطا در اجرای پاسخ هوشمند جمینای: ${error}`, error);
       
@@ -1025,7 +1197,11 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
 
       const resAi = await generateAiContent(evaluationPrompt, true, 0.7, 1000, MODEL_TIER_FAST_LITE);
       const parsed = parseJsonFromAi<Record<string, unknown>>(resAi.text);
-      res.json(parsed);
+      res.json({
+        ...parsed,
+        _activeModel: resAi.usedModel,
+        _latencyMs: resAi.latencyMs,
+      });
     } catch (error) {
       console.error('Error evaluating verdict:', error);
       const isCorrect = isDirectMatch && verdictType === 'guilty';

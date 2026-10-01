@@ -80,25 +80,25 @@ export const ConsultationRoom: React.FC<ConsultationRoomProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-in fade-in duration-300">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6 sm:space-y-8 animate-in fade-in duration-300">
       {/* Header Banner */}
-      <div className="rounded-3xl bg-gradient-to-br from-[#181a28] via-[#131522] to-[#0d0e17] border border-amber-900/40 p-6 md:p-10 shadow-2xl relative overflow-hidden text-center space-y-4">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>طراحی آنی و هوشمند پرونده جنایی با هوش مصنوعی جمینای</span>
+      <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-br from-[#181a28] via-[#131522] to-[#0d0e17] border border-amber-900/40 p-4 sm:p-6 md:p-10 shadow-2xl relative overflow-hidden text-center space-y-3 sm:space-y-4">
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] sm:text-xs font-bold">
+          <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+          <span>طراحی آنی و هوشمند پرونده با جمینای</span>
         </div>
 
-        <h1 className="text-2xl md:text-4xl font-black text-amber-100 tracking-tight">
+        <h1 className="text-xl sm:text-2xl md:text-4xl font-black text-amber-100 tracking-tight">
           چه پرونده‌ای می‌خواهید امروز قضاوت کنید؟
         </h1>
 
-        <p className="text-xs md:text-sm text-stone-400 max-w-2xl mx-auto leading-relaxed">
-          فقط موضوع یا کلمه کلیدی پرونده مورد نظرتان را بنویسید (مثلاً: <strong className="text-amber-300">قتل بازیکن فوتبال</strong> یا هر چیز دیگر). جمینای در چند ثانیه تمام سناریو، اشخاص، متهم فریبکار، گزارش پزشکی قانونی و مدارک را خلق کرده و شما را مستقیم وارد دادگاه می‌کند!
+        <p className="text-[11px] sm:text-xs md:text-sm text-stone-400 max-w-2xl mx-auto leading-relaxed">
+          فقط موضوع یا کلمه کلیدی پرونده مورد نظرتان را بنویسید (مثلاً: <strong className="text-amber-300">قتل بازیکن فوتبال</strong> یا <strong className="text-amber-300">سرقت الماس</strong>). جمینای در چند ثانیه تمام سناریو، اشخاص، متهم فریبکار و مدارک را خلق می‌کند!
         </p>
 
         {/* Instant Topic Input Area */}
-        <div className="max-w-2xl mx-auto pt-4 space-y-3">
-          <div className="flex flex-col sm:flex-row items-center gap-2 bg-[#0f1118] p-2 rounded-2xl border-2 border-amber-600/40 shadow-xl focus-within:border-amber-500 transition-colors">
+        <div className="max-w-2xl mx-auto pt-2 sm:pt-4 space-y-3">
+          <div className="flex flex-col sm:flex-row items-center gap-2 bg-[#0f1118] p-1.5 sm:p-2 rounded-2xl border-2 border-amber-600/40 shadow-xl focus-within:border-amber-500 transition-colors">
             <input
               type="text"
               value={topicInput}
@@ -109,24 +109,24 @@ export const ConsultationRoom: React.FC<ConsultationRoomProps> = ({
                   handleCreateCase();
                 }
               }}
-              placeholder="موضوع پرونده را تایپ کنید (مثلاً: قتل بازیکن فوتبال، سرقت الماس...)"
+              placeholder="موضوع پرونده را بنویسید (مثلاً: قتل بازیکن فوتبال...)"
               disabled={isGenerating}
-              className="flex-1 bg-transparent px-4 py-3 text-sm md:text-base text-stone-100 placeholder-stone-500 focus:outline-none w-full"
+              className="flex-1 bg-transparent px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm md:text-base text-stone-100 placeholder-stone-500 focus:outline-none w-full"
             />
 
             <button
               onClick={() => handleCreateCase()}
               disabled={isGenerating || !topicInput.trim()}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-400 text-stone-950 font-black text-sm shadow-lg shadow-amber-950/50 transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2 shrink-0 active:scale-98"
+              className="w-full sm:w-auto px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 hover:from-amber-500 hover:to-amber-400 text-stone-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-950/50 transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2 shrink-0 active:scale-98 min-h-[44px]"
             >
               {isGenerating ? (
                 <>
-                  <RefreshCw className="w-5 h-5 animate-spin text-stone-950" />
+                  <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-stone-950" />
                   <span>در حال خلق...</span>
                 </>
               ) : (
                 <>
-                  <Wand2 className="w-5 h-5 text-stone-950" />
+                  <Wand2 className="w-4 h-4 sm:w-5 sm:h-5 text-stone-950" />
                   <span>ساخت هوشمند پرونده</span>
                 </>
               )}
@@ -135,8 +135,8 @@ export const ConsultationRoom: React.FC<ConsultationRoomProps> = ({
 
           {/* Loading status bar */}
           {isGenerating && (
-            <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 flex items-center justify-center gap-3 animate-pulse shadow-lg">
-              <RefreshCw className="w-5 h-5 text-amber-400 animate-spin shrink-0" />
+            <div className="p-3 sm:p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-[11px] sm:text-xs text-amber-200 flex items-center justify-center gap-2.5 sm:gap-3 animate-pulse shadow-lg">
+              <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 animate-spin shrink-0" />
               <span className="font-semibold">{generationStep}</span>
             </div>
           )}
@@ -144,13 +144,13 @@ export const ConsultationRoom: React.FC<ConsultationRoomProps> = ({
       </div>
 
       {/* Quick Topic Chips Suggestions */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
           <Flame className="w-4 h-4 text-amber-400" />
           <span>پیشنهادهای محبوب آماده برای کلیک مستقیم:</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
           {quickTopics.map((item, idx) => (
             <button
               key={idx}
