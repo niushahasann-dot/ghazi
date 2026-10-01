@@ -13,15 +13,17 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Model selection strictly prioritizing modern Gemini flash models (3.8, 3.7, 3.6, 3.5)
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Model selection strictly prioritizing gemini-3.5-flash-lite for testing
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const FALLBACK_MODELS = Array.from(
   new Set([
     PRIMARY_MODEL,
+    'gemini-3.5-flash-lite',
     'gemini-3.8-flash',
     'gemini-3.7-flash',
     'gemini-3.6-flash',
     'gemini-3.5-flash',
+    'models/gemini-3.5-flash-lite',
     'models/gemini-3.8-flash',
     'models/gemini-3.7-flash',
     'models/gemini-3.6-flash',
