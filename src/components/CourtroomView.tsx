@@ -532,6 +532,12 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                     <p><strong className="text-amber-400">شغل رسمی:</strong> {activeChar.occupation}</p>
                     <p><strong className="text-amber-400">سن:</strong> {activeChar.age} سال</p>
                     <p><strong className="text-amber-400">رابطه با قربانی:</strong> {activeChar.relationToVictim}</p>
+                    <p>
+                      <strong className="text-amber-400">تیپ مزاجی و روحی:</strong>{' '}
+                      <span className={activeChar.temperament === 'anxious' ? 'text-red-400 font-extrabold animate-pulse' : activeChar.temperament === 'calm' ? 'text-emerald-400 font-bold' : 'text-stone-300'}>
+                        {activeChar.temperament === 'anxious' ? 'عصبی و زودرنج (ریسک بالای درگیری)' : activeChar.temperament === 'calm' ? 'خونسرد و صبور' : 'معمولی'}
+                      </span>
+                    </p>
                     <p className="pt-2 border-t border-stone-800"><strong className="text-amber-400">روانشناسی کاراکتر:</strong> {activeChar.personality}</p>
                   </div>
 

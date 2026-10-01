@@ -267,9 +267,75 @@ export default function App() {
       };
 
       setCourtroomMessages((prev) => [...prev, characterReplyMsg]);
+
+      // If Gemini returned an organic autonomous interruption:
+      if (data.interruption) {
+        // Trigger a dramatic sequence!
+        const tid1 = window.setTimeout(() => {
+          soundManager.playObjection();
+          const disputeMsg1: InterrogationMessage = {
+            id: `dispute-auto-${Date.now()}-1`,
+            sender: 'dispute_character',
+            senderName: data.interruption.interrupterName,
+            text: data.interruption.interrupterText,
+            timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+          };
+          setCourtroomMessages((prev) => [...prev, disputeMsg1]);
+
+          // After another 1.8 seconds, the original character replies back in anger!
+          const tid2 = window.setTimeout(() => {
+            soundManager.playPaperRustle();
+            const disputeMsg2: InterrogationMessage = {
+              id: `dispute-auto-${Date.now()}-2`,
+              sender: 'character',
+              senderName: activeChar.name,
+              characterId: activeChar.id,
+              text: data.interruption.replyText,
+              timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+            };
+            setCourtroomMessages((prev) => [...prev, disputeMsg2]);
+
+            // Turn on active heated dispute mode so they keep trading generic/procedural barbs!
+            setIsDisputeActive(true);
+            
+            // Queue generic angry back-and-forth lines to keep the argument alive until the gavel is hit!
+            const timeouts: number[] = [];
+            const genericAngryLines = [
+              { senderName: data.interruption.interrupterName, text: 'جناب قاضی، این آقا دارد کاملاً دروغ می‌گوید تا خودش را تبرئه کند!' },
+              { senderName: activeChar.name, text: 'خفه شو! تو خودت آن شب در عمارت بودی و کلید کتابخانه دست تو بود!' },
+              { senderName: data.interruption.interrupterName, text: 'تهمت نزن شیاد! سوابق بانکی و الایبی جعلی تو همه چیز را آشکار خواهد کرد!' },
+              { senderName: activeChar.name, text: 'سر جایت بنشین و بگذار حقیقت مشخص شود!' }
+            ];
+            genericAngryLines.forEach((line, index) => {
+              const tid = window.setTimeout(() => {
+                setIsDisputeActive((active) => {
+                  if (active) {
+                    soundManager.playObjection();
+                    const nextMsg: InterrogationMessage = {
+                      id: `dispute-auto-loop-${Date.now()}-${index}`,
+                      sender: index % 2 === 0 ? 'dispute_character' : 'character',
+                      senderName: line.senderName,
+                      text: line.text,
+                      timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+                    };
+                    setCourtroomMessages((prev) => [...prev, nextMsg]);
+                  }
+                  return active;
+                });
+              }, (index + 1) * 3500);
+              timeouts.push(tid);
+            });
+            setDisputeTimeoutIds(timeouts);
+
+          }, 1800);
+          setDisputeTimeoutIds((prev) => [...prev, tid2]);
+
+        }, 1500);
+        setDisputeTimeoutIds((prev) => [...prev, tid1]);
+      }
     } catch (err) {
       console.error(err);
-    } {
+    } finally {
       setIsInterrogating(false);
     }
   };

@@ -27,6 +27,7 @@ export interface Character {
   isLying: boolean;
   deceptionStrategy?: string; // strategy to fool the judge
   vulnerabilities?: string[]; // contradictory evidence that breaks their story
+  temperament?: 'calm' | 'anxious' | 'normal';
 }
 
 export interface AutopsyReport {

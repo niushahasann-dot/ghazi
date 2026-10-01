@@ -677,7 +677,7 @@ ${caseData.title} | ${caseData.briefing}
     }
   });
 
-  // Interrogation API
+  // Interrogation API with Autonomous Character Interruption based on Temperament
   app.post('/api/interrogate', async (req: Request, res: Response) => {
     const { caseData, characterId, question, evidencePresentedId, history } = req.body;
 
@@ -699,6 +699,7 @@ ${caseData.title} | ${caseData.briefing}
         innerThought: isDef ? 'باید خونسرد بمانم و اجازه ندهم متوجه تناقض زمان‌بندی یا مدارک بشوند...' : undefined,
         slipUp: evidence ? `تناقض در خصوص مکان و چگونگی کشف ${evidence.title}` : undefined,
         stressDelta: evidence ? 18 : 6,
+        interruption: null
       });
     }
 
@@ -707,16 +708,26 @@ ${caseData.title} | ${caseData.briefing}
         .map((h: { sender: string; text: string }) => `${h.sender}: ${h.text}`)
         .join('\n');
 
+      const otherChars = (caseData.characters || [])
+        .filter((c: Character) => c.id !== characterId)
+        .map((c: Character) => `- نام: ${c.name} | سمت: ${c.roleTitle} | روحیات: ${c.personality} | وضعیت اخلاقی: ${c.temperament || 'normal'}`)
+        .join('\n');
+
       const prompt = `شما در حال نقش‌آفرینی زنده در صحن دادگاه جنایی بازی «آقای قاضی» هستید.
-نام شخصیتی که باید نقشش را بازی کنید: ${char.name}
+شخصیت اصلی که در تریبون است و باید پاسخ مستقیم بدهد:
+نام: ${char.name}
 نقش در دادگاه: ${char.roleTitle} (${char.role})
 سن: ${char.age} سال | شغل: ${char.occupation}
 روابط با قربانی: ${char.relationToVictim}
 روحیات و شخصیت: ${char.personality}
+وضعیت اخلاقی و عصبی کاراکتر (temperament): ${char.temperament || 'normal'} (calm=آرام، anxious=عصبی و تدافعی، normal=معمولی)
 استراتژی دروغ و فریب متهم: ${char.deceptionStrategy || 'ندارد'}
 نقاط ضعف و تناقضات متهم: ${(char.vulnerabilities || []).join(', ')}
 
-خلاصه پرونده:
+سایر کاراکترهای حاضر در سالن دادگاه (که در جایگاه تماشاچیان یا صندلی خود نشسته‌اند):
+${otherChars}
+
+خلاصه پرونده جنایی:
 ${caseData.briefing}
 حقیقت پنهان واقعی پشت پرده:
 ${caseData.hiddenTruth?.howCrimeHappened || ''}
@@ -729,28 +740,38 @@ ${historyStr}
 "${question}"
 ${evidence ? `مدرک پیوست‌شده توسط قاضی که شخص با آن مواجه شده است:\nعنوان مدرک: ${evidence.title}\nشرح مدرک: ${evidence.description}\nمحل کشف: ${evidence.foundAt}\nگزارش آزمایشگاه: ${evidence.labReport}` : 'هیچ مدرک فیزیکی ارائه نشده است.'}
 
-دستورالعمل ایفای نقش:
-۱. کاملاً در قالب این کاراکتر با لحن و احساسات واقعی صحبت کنید (ترس، انکار، لکنت، غرور، دفاع حقوقی یا پرخاشگری).
-۲. اگر متهم هستید، بر اساس استراتژی فریبکاری خود دروغ بگویید یا انکار کنید. اما اگر قاضی مدرکی ارائه داد که با ادعای شما تناقض دارد، دچار تپش قلب و دستپاچگی شوید و شاید دچار لغزش زبانی کوچک (slipUp) شوید!
-۳. اگر وکیل مدافع نیاز به مداخله دید (اعتراض به نحوه سوال قاضی یا مدرک نامعتبر)، متن اعتراض وکیل را نیز پر کنید.
+دستورالعمل‌های ایفای نقش بسیار مهم:
+۱. در قالب شخصیت اصلی پاسخ دقیق، داستانی و فارسی بدهید.
+۲. اگر متهم هستید، بر اساس استراتژی خود دروغ بگویید یا انکار کنید. اما اگر با مدرک متناقض مواجه شدید، دستپاچه شوید و شاید دچار لغزش زبانی کوچک (slipUp) شوید.
+۳. وکیل مدافع در صورت نیاز اعتراض خود را در "lawyerIntervention" ثبت کند.
+۴. **مداخله و قطع کلام خودکار (interruption)**: بررسی کنید آیا این سوال قاضی یا مدرک پیوست‌شده، اتهام بزرگی را متوجه یکی دیگر از شخصیت‌های حاضر در صحن دادگاه می‌کند؟ یا اینکه صحبت‌های شخصیت اصلی، دروغ عیانی است که یکی از متهمان عصبی (anxious) یا شاکی را خشمگین می‌کند؟
+   - اگر بله (به خصوص اگر شخصیت دیگر روحیاتی عصبی/anxious یا معمولی داشته باشد و احساس خطر کند)، او ناگهان بدون اجازه وسط صحبت می‌پرد و داد می‌زند!
+   - در این صورت، بخش "interruption" را با مشخصات آن شخصیت پر کنید. در غیر این صورت آن را کاملاً null بگذارید.
 
-خروجی صرفاً یک JSON معتبر باشد با ساختار زیر (بدون هیچ کلمه اضافی):
+خروجی صرفاً یک JSON معتبر باشد با ساختار زیر (بدون هیچ کلمه اضافی قبل یا بعد):
 {
-  "speech": "پاسخ مستقیم و دیالوگ کاراکتر در صحن دادگاه به زبان فارسی",
-  "innerThought": "فکر مخفیانه یا استرس درون ذهن کاراکتر (اختیاری)",
-  "slipUp": "اگر متهم دچار تناقض یا سوتی کلامی شد شرح کوتاه آن، در غیر این صورت null",
+  "speech": "پاسخ مستقیم و دیالوگ کاراکتر اصلی در صحن دادگاه به زبان فارسی",
+  "innerThought": "فکر مخفیانه یا استرس درون ذهن کاراکتر اصلی (اختیاری)",
+  "slipUp": "اگر متهم اصلی دچار تناقض یا سوتی کلامی شد شرح کوتاه آن، در غیر این صورت null",
   "stressDelta": 10,
-  "lawyerIntervention": "اگر وکیل مدافع کاراکتر اعتراض قانونی دارد متن اعتراض او، در غیر این صورت null"
+  "lawyerIntervention": "اگر وکیل مدافع کاراکتر اصلی اعتراض دارد متن اعتراض او، در غیر این صورت null",
+  "interruption": {
+    "interrupterId": "آیدی کاراکتر معترض که وسط حرف پرید",
+    "interrupterName": "نام کاراکتر معترض",
+    "interrupterText": "جمله تند، پرخاشگرانه و معترض کاراکتر معترض که بدون اجازه وسط حرف پریده و متهم اصلی یا قاضی را مخاطب قرار می‌دهد",
+    "replyText": "پاسخ تند، متقابل و عصبی متهم اصلی در دفاع از خود به کاراکتر معترض"
+  }
 }`;
 
-      const resAi = await generateAiContent(prompt, true, 0.8);
-      const parsed = parseJsonFromAi<Record<string, unknown>>(resAi.text);
+      const resAi = await generateAiContent(prompt, true, 0.85);
+      const parsed = parseJsonFromAi<Record<string, any>>(resAi.text);
       res.json(parsed);
     } catch (error) {
       console.error('Error in interrogate API:', error);
       res.json({
         speech: `جناب قاضی، بنده (${char.name}) توضیحاتم را دادم و خواهان انطباق اسناد با گواهی شهود هستم.`,
         stressDelta: 5,
+        interruption: null
       });
     }
   });

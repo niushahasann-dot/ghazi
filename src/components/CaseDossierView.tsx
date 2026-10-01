@@ -301,6 +301,12 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
                 <div className="space-y-1 text-xs text-stone-300 bg-[#10121d] p-3 rounded-xl border border-stone-850">
                   <p className="truncate"><strong className="text-stone-400">شغل:</strong> {char.occupation}</p>
                   <p className="truncate"><strong className="text-stone-400">رابطه با مقتول:</strong> {char.relationToVictim}</p>
+                  <p className="truncate">
+                    <strong className="text-stone-400">مزاج و روحیات:</strong>{' '}
+                    <span className={char.temperament === 'anxious' ? 'text-red-400 font-bold animate-pulse' : char.temperament === 'calm' ? 'text-emerald-400' : 'text-stone-300'}>
+                      {char.temperament === 'anxious' ? 'عصبی و تدافعی' : char.temperament === 'calm' ? 'خونسرد و آرام' : 'معمولی'}
+                    </span>
+                  </p>
                 </div>
 
                 <div className="text-xs text-stone-400 leading-relaxed italic line-clamp-3">
