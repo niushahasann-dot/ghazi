@@ -56,6 +56,20 @@ class SoundController {
       } catch (e) {
         console.warn('Could not initialize gavel audio element', e);
       }
+
+      // Aggressive Audio Autoplay Unlocker on ANY user gesture
+      const unlockAudio = () => {
+        this.initContext();
+        if (this.bgMusicEnabled && !this.isBgMusicPlayingState) {
+          this.playBgMusic();
+        }
+      };
+
+      if (typeof window !== 'undefined') {
+        ['click', 'pointerdown', 'mousedown', 'touchstart', 'touchend', 'keydown', 'wheel', 'scroll'].forEach((evt) => {
+          window.addEventListener(evt, unlockAudio, { passive: true });
+        });
+      }
     }
   }
 
@@ -502,6 +516,8 @@ class SoundController {
 
     try {
       this.bgAudio = new Audio(track.url);
+      this.bgAudio.preload = 'auto';
+      this.bgAudio.autoplay = true;
       this.bgAudio.volume = this.bgMusicVolume;
 
       // When track finishes, automatically advance to next track in playlist (sequential + infinite loop)

@@ -10,7 +10,7 @@ import { ConsultationRoom } from './components/ConsultationRoom.tsx';
 import { MainMenu } from './components/MainMenu.tsx';
 import { SettingsModal, SettingsTab } from './components/SettingsModal.tsx';
 import { OfflineIndicator } from './components/OfflineIndicator.tsx';
-import { Home, Sparkles, Settings } from 'lucide-react';
+import { Home, Sparkles, Settings, Volume2 } from 'lucide-react';
 
 export default function App() {
   // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session)
@@ -51,20 +51,22 @@ export default function App() {
   const [isDisputeLoading, setIsDisputeLoading] = useState(false);
   const [disputeTimeoutIds, setDisputeTimeoutIds] = useState<number[]>([]);
 
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+
   // Continuous Background Playlist (Plays across ALL screens of the game sequentially and loops)
   useEffect(() => {
     soundManager.playBgMusic();
 
-    const handleFirstUserInteraction = () => {
+    const triggerPlay = () => {
+      setHasUserInteracted(true);
       soundManager.playBgMusic();
     };
 
-    window.addEventListener('pointerdown', handleFirstUserInteraction, { once: true });
-    window.addEventListener('keydown', handleFirstUserInteraction, { once: true });
+    const events = ['click', 'pointerdown', 'mousedown', 'touchstart', 'touchend', 'keydown', 'wheel', 'scroll'];
+    events.forEach((evt) => window.addEventListener(evt, triggerPlay, { passive: true }));
 
     return () => {
-      window.removeEventListener('pointerdown', handleFirstUserInteraction);
-      window.removeEventListener('keydown', handleFirstUserInteraction);
+      events.forEach((evt) => window.removeEventListener(evt, triggerPlay));
     };
   }, []);
 
@@ -567,6 +569,20 @@ export default function App() {
 
       {/* PWA Offline Connectivity Indicator */}
       <OfflineIndicator />
+
+      {/* Autoplay Unlocker Prompt Banner (if browser blocked cold-load autoplay) */}
+      {!hasUserInteracted && !soundManager.isBgMusicPlaying() && (
+        <div
+          onClick={() => {
+            setHasUserInteracted(true);
+            soundManager.playBgMusic();
+          }}
+          className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-700 via-amber-600 to-amber-800 text-stone-950 font-bold px-4 py-2.5 text-center text-xs sm:text-sm shadow-2xl flex items-center justify-center gap-2 cursor-pointer border-b border-amber-400 animate-bounce"
+        >
+          <Volume2 className="w-4 h-4 text-stone-950 animate-pulse shrink-0" />
+          <span>🔊 جهت فعال‌سازی فوری صدای دادگاه و پخش موسیقی کلیک کنید (برای ورود بزنید)</span>
+        </div>
+      )}
     </div>
   );
 }
