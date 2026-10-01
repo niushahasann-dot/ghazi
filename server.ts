@@ -13,8 +13,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Model selection strictly restricted to Gemini 3.x Flash series (3.8, 3.7, 3.6, 3.5) with optional models/ prefix
-const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+// Model selection strictly prioritizing modern Gemini flash models (3.8, 3.7, 3.6, 3.5)
+const PRIMARY_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const FALLBACK_MODELS = Array.from(
   new Set([
     PRIMARY_MODEL,
@@ -67,7 +67,7 @@ function parseJsonFromAi<T>(rawText: string): T {
 }
 
 // 1. Initialize Gemini AI Client
-const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || '';
+const apiKey = process.env.MY_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.API_KEY || '';
 const customBaseUrl = process.env.GEMINI_BASE_URL || process.env.GOOGLE_GENAI_BASE_URL || '';
 
 let ai: GoogleGenAI | null = null;
@@ -602,17 +602,13 @@ async function startServer() {
       return res.json({ success: false, report });
     }
 
-    // 3. Mini test query to Gemini
+    // 3. Mini test query to Gemini using robust generateAiContent helper
     try {
-      addSystemLog('info', 'Diagnostics', `تست فراخوانی زنده با مدل پیش‌فرض: ${PRIMARY_MODEL}`);
-      const testRes = await ai.models.generateContent({
-        model: PRIMARY_MODEL,
-        contents: 'سلام. فقط کلمه "موفق" را برگردان.',
-        config: { temperature: 0.1, maxOutputTokens: 10 }
-      });
-      if (testRes && testRes.text) {
-        report.geminiPing = `موفق. پاسخ دریافتی: "${testRes.text.trim()}"`;
-        addSystemLog('success', 'Diagnostics', `تست فراخوانی زنده با موفقیت به پایان رسید. پاسخ: ${testRes.text}`);
+      addSystemLog('info', 'Diagnostics', `تست فراخوانی زنده با سامانه آبشاری مدل‌ها`);
+      const testResult = await generateAiContent('سلام. فقط کلمه "موفق" را برگردان.', false, 0.1, 10);
+      if (testResult && testResult.text) {
+        report.geminiPing = `موفق (با مدل ${testResult.usedModel}). پاسخ: "${testResult.text.trim()}"`;
+        addSystemLog('success', 'Diagnostics', `تست فراخوانی زنده با موفقیت به پایان رسید. مدل: ${testResult.usedModel}`);
         return res.json({ success: true, report });
       } else {
         throw new Error('پاسخ خالی یا نامعتبر از جمینای دریافت شد.');
