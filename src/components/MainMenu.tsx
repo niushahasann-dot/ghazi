@@ -14,7 +14,8 @@ import {
   MapPin,
   AlertTriangle,
   X,
-  Play
+  Play,
+  Terminal
 } from 'lucide-react';
 import { CaseDossier } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
@@ -26,6 +27,7 @@ interface MainMenuProps {
   isSoundOn: boolean;
   setIsSoundOn: (val: boolean) => void;
   onGavelStrike: () => void;
+  onOpenDiagnostics: () => void;
 }
 
 export const MainMenu: React.FC<MainMenuProps> = ({
@@ -35,6 +37,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   isSoundOn,
   setIsSoundOn,
   onGavelStrike,
+  onOpenDiagnostics,
 }) => {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState(false);
@@ -70,6 +73,18 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              soundManager.playPaperRustle();
+              onOpenDiagnostics();
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-950/20 hover:bg-amber-950/40 border border-amber-800 text-amber-400 hover:text-amber-300 text-xs font-bold transition-all cursor-pointer shadow animate-pulse"
+            title="کنسول دیباگ و لاگ‌های زنده جمینای"
+          >
+            <Terminal className="w-3.5 h-3.5 text-amber-500" />
+            <span>دیباگر سیستم</span>
+          </button>
+
           <button
             onClick={() => {
               soundManager.playGavel();

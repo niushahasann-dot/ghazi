@@ -55,14 +55,19 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
 }) => {
   const [inputText, setInputText] = useState('');
   const [showEvidenceSelector, setShowEvidenceSelector] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const activeChar = caseData.characters.find((c) => c.id === activeCharacterId) || caseData.characters[0];
   const currentStress = characterStressMap[activeChar.id] ?? activeChar.suspicionLevel;
 
-  // Auto-scroll chat to bottom
+  // Auto-scroll chat to bottom strictly within the container, leaving the main window scroll untouched
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
   }, [messages, isLoading, isDisputeActive]);
 
   const handleSend = async (e?: React.FormEvent) => {
@@ -293,7 +298,7 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
             </div>
 
             {/* Trial Speech Scroll Area */}
-            <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-[#0d0e16]/85">
+            <div ref={chatContainerRef} className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-[#0d0e16]/85">
               {/* Initial Statement Record */}
               <div className="p-4 rounded-2xl bg-[#161826]/80 border border-stone-800/80 text-xs text-stone-300 space-y-1.5 shadow-sm">
                 <span className="text-amber-400 font-bold block">متن اظهارات اولیه ثبت‌شده در محضر دادگاه:</span>
@@ -383,8 +388,6 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                   <span>شخص در حال پاسخگویی به هیئت دادگاه است...</span>
                 </div>
               )}
-
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Trial Action Board & Input Form */}

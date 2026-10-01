@@ -29,6 +29,36 @@ const FALLBACK_MODELS = Array.from(
   ])
 );
 
+// ============================================================================
+// SYSTEM LOGGING FRAMEWORK (For live debugging in the frontend UI)
+// ============================================================================
+export interface SystemLog {
+  id: string;
+  timestamp: string;
+  type: 'info' | 'warn' | 'error' | 'success';
+  module: string;
+  message: string;
+  details?: any;
+}
+
+export const systemLogs: SystemLog[] = [];
+
+export function addSystemLog(type: SystemLog['type'], module: string, message: string, details?: any) {
+  const log: SystemLog = {
+    id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString(),
+    type,
+    module,
+    message,
+    details: details ? JSON.parse(JSON.stringify(details, Object.getOwnPropertyNames(details))) : undefined,
+  };
+  systemLogs.unshift(log);
+  if (systemLogs.length > 150) {
+    systemLogs.pop();
+  }
+  console.log(`[${log.timestamp}] [${type.toUpperCase()}] [${module}] ${message}`);
+}
+
 // Helper to strip Markdown codeblocks before JSON parsing
 function parseJsonFromAi<T>(rawText: string): T {
   let cleaned = (rawText || '').trim();
@@ -52,20 +82,29 @@ if (apiKey) {
         },
       },
     });
-    console.log(`[پل جمینای] ارتباط با سرویس هوش مصنوعی جمینای (${PRIMARY_MODEL}) فعال گردید.`);
-  } catch (err) {
-    console.error('[پل جمینای] خطا در راه‌اندازی کلاینت هوش مصنوعی:', err);
+    const maskedKey = apiKey.substring(0, 8) + '...' + apiKey.substring(apiKey.length - 4);
+    addSystemLog('success', 'GeminiClient', `کلاینت هوش مصنوعی با موفقیت تنظیم شد. کلید استفاده شده: ${maskedKey}`);
+    if (customBaseUrl) {
+      addSystemLog('info', 'GeminiClient', `آدرس سفارشی سرور تنظیم شده است: ${customBaseUrl}`);
+    }
+  } catch (err: any) {
+    addSystemLog('error', 'GeminiClient', `خطا در راه‌اندازی کلاینت هوش مصنوعی: ${err?.message || err}`, err);
   }
 } else {
-  console.warn('[پل جمینای] کلید GEMINI_API_KEY در متغیرهای محیطی یافت نشد. مولد هوشمند داستان جنایی فعال شد.');
+  addSystemLog('warn', 'GeminiClient', 'کلید GEMINI_API_KEY در متغیرهای محیطی یافت نشد! حالت آفلاین سناریونویس فعال شد.');
 }
 
 // Helper to generate content with automatic model fallback & 429 quota backoff
-async function generateAiContent(prompt: string, isJsonMode = false, temperature = 0.85) {
-  if (!ai) throw new Error('AI client not initialized');
+async function generateAiContent(prompt: string, isJsonMode = false, temperature = 0.85, maxOutputTokens?: number) {
+  if (!ai) {
+    addSystemLog('error', 'GeminiAPI', 'تلاش برای تولید محتوا در حالی که کلاینت هوش مصنوعی فعال نیست (بدون کلید API)');
+    throw new Error('AI client not initialized');
+  }
 
-  let lastError: unknown = null;
+  let lastError: any = null;
   const triedModels = new Set<string>();
+
+  addSystemLog('info', 'GeminiAPI', `شروع فراخوانی تولید محتوا با ${FALLBACK_MODELS.length} کاندید مدل`);
 
   for (const modelCandidate of FALLBACK_MODELS) {
     if (triedModels.has(modelCandidate)) continue;
@@ -73,25 +112,35 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
+        addSystemLog('info', 'GeminiAPI', `تلاش برای ارسال درخواست به مدل [${modelCandidate}] - تلاش شماره ${attempt}`);
+        
         const response = await ai.models.generateContent({
           model: modelCandidate,
           contents: prompt,
           config: {
             ...(isJsonMode ? { responseMimeType: 'application/json' } : {}),
             temperature,
+            ...(maxOutputTokens ? { maxOutputTokens } : {}),
           },
         });
+
         if (response && response.text) {
+          addSystemLog('success', 'GeminiAPI', `دریافت موفق پاسخ از مدل [${modelCandidate}] در تلاش ${attempt}`, {
+            characterCount: response.text.length,
+            preview: response.text.substring(0, 150) + '...'
+          });
           return { text: response.text, usedModel: modelCandidate };
         }
       } catch (err: any) {
         const errMsg = err?.message || String(err);
-        const is429 = err?.status === 429 || errMsg.includes('429') || errMsg.includes('Quota') || errMsg.includes('RESOURCE_EXHAUSTED');
-        console.warn(`[پل جمینای] مدل ${modelCandidate} (تلاش ${attempt}) ${is429 ? 'دچار سقف تعداد درخواست (429)' : 'پاسخ نداد'}`);
+        const status = err?.status || err?.statusCode || 'UnknownStatus';
+        const is429 = status === 429 || errMsg.includes('429') || errMsg.includes('Quota') || errMsg.includes('RESOURCE_EXHAUSTED');
+        
+        addSystemLog('warn', 'GeminiAPI', `خطا در مدل [${modelCandidate}] (تلاش ${attempt}) - کد وضعیت: ${status} | پیام: ${errMsg}`, err);
         lastError = err;
 
         if (is429 && attempt === 1) {
-          // Pause briefly for 1 second before retrying or switching models
+          addSystemLog('info', 'GeminiAPI', 'پاسخ 429 (سقف تعداد درخواست) دریافت شد. ایجاد تاخیر ۱ ثانیه‌ای قبل از تلاش مجدد...');
           await new Promise((r) => setTimeout(r, 1000));
         } else {
           break;
@@ -99,6 +148,8 @@ async function generateAiContent(prompt: string, isJsonMode = false, temperature
       }
     }
   }
+  
+  addSystemLog('error', 'GeminiAPI', 'تمام مدل‌های کاندید فلش با خطا مواجه شدند! رجوع به حالت پشتیبان آفلاین.', lastError);
   throw lastError || new Error('All Gemini candidate models failed.');
 }
 
@@ -513,6 +564,73 @@ async function startServer() {
   }
 
   // API Routes
+  app.get('/api/system-logs', (_req: Request, res: Response) => {
+    res.json(systemLogs);
+  });
+
+  app.post('/api/diagnose-gemini', async (_req: Request, res: Response) => {
+    addSystemLog('info', 'Diagnostics', 'فراخوانی تست اتصال دستی به جمینای آغاز شد.');
+    const report: any = {
+      timestamp: new Date().toISOString(),
+      apiKeyConfigured: !!apiKey,
+      apiKeyMasked: apiKey ? apiKey.substring(0, 8) + '...' + apiKey.substring(apiKey.length - 4) : 'یافت نشد',
+      customBaseUrl: customBaseUrl || 'پیش‌فرض گوگل',
+      dnsTest: 'کامل نشده',
+      geminiPing: 'کامل نشده',
+      errors: []
+    };
+
+    // 1. DNS / connectivity check
+    try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 4000);
+      const pingRes = await fetch('https://generativelanguage.googleapis.com/', { signal: controller.signal });
+      clearTimeout(id);
+      report.dnsTest = `موفق (کد وضعیت: ${pingRes.status})`;
+      addSystemLog('success', 'Diagnostics', 'تست دسترسی اینترنتی به دامنه گوگل موفقیت‌آمیز بود.');
+    } catch (err: any) {
+      report.dnsTest = `خطا در اتصال: ${err?.message || err}`;
+      report.errors.push(`خطای دسترسی به اینترنت: ${err?.message || err}`);
+      addSystemLog('error', 'Diagnostics', 'خطای عدم دسترسی اینترنتی به گوگل مپ/جمینای از هاست', err);
+    }
+
+    // 2. Client initialization verification
+    if (!ai) {
+      report.geminiPing = 'کلید API تنظیم نشده است';
+      report.errors.push('کلاینت هوش مصنوعی ساخته نشده است زیرا کلید API یافت نشد.');
+      addSystemLog('warn', 'Diagnostics', 'تست متوقف شد: کلید API معتبر یافت نشد.');
+      return res.json({ success: false, report });
+    }
+
+    // 3. Mini test query to Gemini
+    try {
+      addSystemLog('info', 'Diagnostics', `تست فراخوانی زنده با مدل پیش‌فرض: ${PRIMARY_MODEL}`);
+      const testRes = await ai.models.generateContent({
+        model: PRIMARY_MODEL,
+        contents: 'سلام. فقط کلمه "موفق" را برگردان.',
+        config: { temperature: 0.1, maxOutputTokens: 10 }
+      });
+      if (testRes && testRes.text) {
+        report.geminiPing = `موفق. پاسخ دریافتی: "${testRes.text.trim()}"`;
+        addSystemLog('success', 'Diagnostics', `تست فراخوانی زنده با موفقیت به پایان رسید. پاسخ: ${testRes.text}`);
+        return res.json({ success: true, report });
+      } else {
+        throw new Error('پاسخ خالی یا نامعتبر از جمینای دریافت شد.');
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      const errStatus = err?.status || err?.statusCode || 'نامعلوم';
+      report.geminiPing = `خطای دیسپاچ: کد ${errStatus} | ${errMsg}`;
+      report.errors.push({
+        message: errMsg,
+        status: errStatus,
+        rawError: err
+      });
+      addSystemLog('error', 'Diagnostics', `تست فراخوانی زنده با شکست مواجه شد. کد خطا: ${errStatus}`, err);
+      return res.json({ success: false, report });
+    }
+  });
+
   app.get('/api/bridge-status', (_req: Request, res: Response) => {
     res.json({
       active: !!ai,
@@ -634,7 +752,7 @@ async function startServer() {
   }
 }`;
 
-      const resAi = await generateAiContent(prompt, true, 0.85);
+      const resAi = await generateAiContent(prompt, true, 0.85, 4000);
       const parsedCase = parseJsonFromAi<CaseDossier>(resAi.text);
       res.json(parsedCase);
     } catch (error) {
@@ -789,16 +907,46 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
   }
 }`;
 
-      const resAi = await generateAiContent(prompt, true, 0.85);
+      const resAi = await generateAiContent(prompt, true, 0.85, 2000);
       const parsed = parseJsonFromAi<Record<string, any>>(resAi.text);
       res.json(parsed);
     } catch (error) {
-      console.error('Error in interrogate API:', error);
+      addSystemLog('error', 'InterrogateAPI', `خطا در اجرای پاسخ هوشمند جمینای: ${error}`, error);
+      
+      // Determine which character was most likely being addressed to keep context intact
+      let targetChar = charsList[0];
+      const cleanQuestion = (question || '').toLowerCase();
+      for (const char of charsList) {
+        if (cleanQuestion.includes(char.name.toLowerCase()) || (char.roleTitle && cleanQuestion.includes(char.roleTitle.toLowerCase()))) {
+          targetChar = char;
+          break;
+        }
+      }
+
+      // Evasive/realistic fallbacks based on role
+      let speech = `جناب قاضی، بنده به عنوان ${targetChar.roleTitle} توضیحات اولیه را ارائه دادم. لطفاً سوال یا مدرک را مجدداً و شفاف‌تر مطرح کنید.`;
+      if (targetChar.role === 'defendant') {
+        const defendantReplies = [
+          `جناب قاضی، بنده تحت فشار شدیدی هستم و نسبت به این اتهام سکوت می‌کنم تا مدارک دقیق‌تری ارائه شود! من بی‌گناهم!`,
+          `ریاست محترم دادگاه، من قبلاً پاسخ این موضوع را داده‌ام و اصرار به بی‌گناهی خود دارم! او دارد مرا متهم می‌کند!`,
+          `جناب قاضی، این پرسش شما یا شهود برای تخریب چهره من طراحی شده است. از ارائه پاسخ‌های فرعی خودداری می‌کنم.`
+        ];
+        speech = defendantReplies[Math.floor(Math.random() * defendantReplies.length)];
+      } else if (targetChar.role === 'witness') {
+        speech = `ریاست محترم، من فقط یک شاهد ساده هستم و بیش از آنچه ثبت شده چیزی به یاد نمی‌آورم. لطفاً مرا تحت فشار قرار ندهید.`;
+      } else if (targetChar.role === 'plaintiff') {
+        speech = `جناب قاضی، ما از دادگاه تقاضای اجرای اشد مجازات را داریم. مدارک و اسناد ما کاملاً واضح و گویای ارتکاب جرم است!`;
+      } else if (targetChar.role === 'expert') {
+        speech = `جناب قاضی، گزارش فنی و تخصصی بنده ضمیمه پرونده است. از نظر کارشناسی من، موضوع نیاز به ممیزی و ارزیابی شواهد موجود دارد.`;
+      }
+
       res.json({
-        addressedCharacterId: charsList[0].id,
-        addressedCharacterName: charsList[0].name,
-        speech: `جناب قاضی، توضیحات لازم داده شده است. لطفاً سوال خود را شفاف‌تر مطرح فرمایید.`,
-        stressDelta: 5,
+        addressedCharacterId: targetChar.id,
+        addressedCharacterName: targetChar.name,
+        speech,
+        innerThought: targetChar.role === 'defendant' ? 'نباید سوتی بدهم... اوضاع خطری شد!' : 'امیدوارم قاضی حقیقت را بفهمد.',
+        slipUp: null,
+        stressDelta: 3,
         interruption: null
       });
     }

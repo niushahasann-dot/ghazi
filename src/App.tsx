@@ -8,11 +8,12 @@ import { CourtroomView } from './components/CourtroomView.tsx';
 import { VerdictModal } from './components/VerdictModal.tsx';
 import { ConsultationRoom } from './components/ConsultationRoom.tsx';
 import { MainMenu } from './components/MainMenu.tsx';
-import { Home, ArrowRight, Sparkles } from 'lucide-react';
+import { DiagnosticsPanel } from './components/DiagnosticsPanel.tsx';
+import { Home, ArrowRight, Sparkles, Terminal } from 'lucide-react';
 
 export default function App() {
-  // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session)
-  const [currentView, setCurrentView] = useState<'menu' | 'consult' | 'game'>('menu');
+  // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session) | 'diagnostics' (system logs terminal)
+  const [currentView, setCurrentView] = useState<'menu' | 'consult' | 'game' | 'diagnostics'>('menu');
   const [currentTab, setCurrentTab] = useState<'dossier' | 'court' | 'verdict'>('court');
 
   // Case loaded
@@ -399,6 +400,10 @@ export default function App() {
           isSoundOn={isSoundOn}
           setIsSoundOn={setIsSoundOn}
           onGavelStrike={handleGavelClick}
+          onOpenDiagnostics={() => {
+            soundManager.playPaperRustle();
+            setCurrentView('diagnostics');
+          }}
         />
       )}
 
@@ -521,6 +526,40 @@ export default function App() {
               setCurrentView('consult');
             }}
           />
+        </div>
+      )}
+
+      {/* 4. Real-time System Logs & Diagnostics View */}
+      {currentView === 'diagnostics' && (
+        <div className="min-h-screen flex flex-col bg-[#08090e]">
+          <header className="sticky top-0 z-40 bg-[#0f111c]/95 backdrop-blur-md border-b border-amber-900/40 px-4 py-3 flex items-center justify-between shadow-xl">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  soundManager.playPaperRustle();
+                  setCurrentView('menu');
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 border border-stone-800 text-stone-300 hover:text-amber-300 text-xs font-semibold transition-all cursor-pointer shadow-sm group"
+              >
+                <Home className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>بازگشت به منوی اصلی</span>
+              </button>
+
+              <div className="h-5 w-px bg-stone-800" />
+
+              <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-amber-100">
+                <Terminal className="w-4 h-4 text-amber-500 animate-pulse" />
+                <span>مرکز عیب‌یابی و مانیتورینگ زنده جمینای</span>
+              </div>
+            </div>
+            <div className="text-[11px] text-stone-500 hidden md:block">
+              کنترل یکپارچه پایداری شبکه و تحلیل پاسخ مدل‌های فلش ۳.۵ الی ۳.۸
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
+            <DiagnosticsPanel />
+          </main>
         </div>
       )}
     </div>
