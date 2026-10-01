@@ -64,7 +64,7 @@ export interface CaseDossier {
 
 export interface InterrogationMessage {
   id: string;
-  sender: 'judge' | 'character' | 'lawyer';
+  sender: 'judge' | 'character' | 'lawyer' | 'dispute_character';
   senderName: string;
   characterId?: string;
   text: string;

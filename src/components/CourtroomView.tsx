@@ -15,7 +15,9 @@ import {
   Scale,
   Mic,
   Activity,
-  FileSignature
+  FileSignature,
+  Heart,
+  Skull
 } from 'lucide-react';
 import { CaseDossier, Character, EvidenceItem, InterrogationMessage } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
@@ -33,6 +35,9 @@ interface CourtroomViewProps {
   setSelectedEvidenceToConfront: (item: EvidenceItem | null) => void;
   onOpenDossier?: () => void;
   onOpenVerdict?: () => void;
+  isDisputeActive: boolean;
+  isDisputeLoading: boolean;
+  onTriggerDispute: () => Promise<void>;
 }
 
 export const CourtroomView: React.FC<CourtroomViewProps> = ({
@@ -48,6 +53,9 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
   setSelectedEvidenceToConfront,
   onOpenDossier,
   onOpenVerdict,
+  isDisputeActive,
+  isDisputeLoading,
+  onTriggerDispute,
 }) => {
   const [inputText, setInputText] = useState('');
   const [showEvidenceSelector, setShowEvidenceSelector] = useState(false);
@@ -59,11 +67,11 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
   // Auto-scroll chat to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, isDisputeActive]);
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if ((!inputText.trim() && !selectedEvidenceToConfront) || isLoading) return;
+    if ((!inputText.trim() && !selectedEvidenceToConfront) || isLoading || isDisputeActive) return;
 
     const query = inputText.trim() || `در خصوص مدرک «${selectedEvidenceToConfront?.title}» چه توضیحی در محضر دادگاه دارید؟`;
     const evId = selectedEvidenceToConfront ? selectedEvidenceToConfront.id : undefined;
@@ -161,26 +169,48 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
           </div>
         </div>
 
-        {/* Character Summon Dock (Judicial Bench View) */}
+        {/* Dynamic Gavel Control Warning Banner (Heated dispute Active) */}
+        {isDisputeActive && (
+          <div className="bg-gradient-to-r from-red-950 via-[#220c11] to-red-950 border-2 border-red-500 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 animate-pulse shadow-2xl relative overflow-hidden">
+            <div className="absolute -top-10 -left-10 w-24 h-24 bg-red-600/10 rounded-full blur-2xl" />
+            <div className="flex items-center gap-3">
+              <Flame className="w-6 h-6 text-red-500 animate-bounce shrink-0" />
+              <div>
+                <strong className="block text-sm sm:text-base text-red-200">🚨 تنش بالا و درگیری لفظی متهمان در صحن دادگاه!</strong>
+                <span className="text-xs text-stone-300">متهمین خشمگین در حال قطع کردن حرف هم و اتهام‌زنی پیاپی هستند. چکش قاضی را بکوبید تا به آنها فرمان سکوت دهید!</span>
+              </div>
+            </div>
+            <button
+              onClick={onGavelClick}
+              className="flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs md:text-sm font-extrabold transition-all cursor-pointer shadow-lg shadow-red-950/40 border border-red-400"
+            >
+              <Gavel className="w-4 h-4 text-white" />
+              <span>کوبیدن چکش و اعلام سکوت</span>
+            </button>
+          </div>
+        )}
+
+        {/* Character Summon Dock (Judicial Bench View) - Dynamic character list with no spoilers */}
         <div className="bg-[#12141f]/90 backdrop-blur-md border border-stone-800/90 rounded-2xl p-3 sm:p-4 shadow-xl">
           <div className="flex items-center justify-between mb-2.5 text-xs">
             <span className="font-bold text-amber-300 flex items-center gap-1.5">
               <UserCheck className="w-4 h-4 text-amber-400" />
-              جایگاه اشخاص حاضر در صحن دادگاه (برای فراخوانی به جایگاه کلیک کنید):
+              فراخوانی اشخاص به تریبون بازجویی دادگاه (جهت طرح سوال اختصاصی کلیک کنید):
             </span>
             <span className="text-stone-400 text-[11px]">
               حاضر در تریبون: <strong className="text-amber-200">{activeChar.name}</strong>
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
             {caseData.characters.map((char) => {
               const isSelected = char.id === activeChar.id;
-              const stress = characterStressMap[char.id] ?? char.suspicionLevel;
+              const isDefendant = char.role === 'defendant';
 
               return (
                 <button
                   key={char.id}
+                  disabled={isDisputeActive}
                   onClick={() => {
                     if (char.id !== activeChar.id) {
                       soundManager.playGavel();
@@ -188,28 +218,33 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                     }
                   }}
                   className={`p-3 rounded-xl border text-right transition-all cursor-pointer relative overflow-hidden ${
+                    isDisputeActive ? 'opacity-40 cursor-not-allowed' : ''
+                  } ${
                     isSelected
                       ? 'bg-gradient-to-br from-[#24293e] to-[#1a1e2f] border-amber-500 shadow-lg shadow-amber-950/40 ring-2 ring-amber-500/40'
                       : 'bg-[#151724]/90 border-stone-800/80 hover:bg-[#1b1e2e] hover:border-stone-700'
                   }`}
                 >
                   {isSelected && (
-                    <span className="absolute top-1.5 left-1.5 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                    <span className="absolute top-1.5 left-1.5 w-2 h-2 bg-amber-400 rounded-full animate-ping" />
                   )}
 
                   <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="text-xs font-bold text-stone-100 truncate">{char.name}</span>
+                    <span className="text-xs font-bold text-stone-100 truncate block w-full">{char.name}</span>
                   </div>
 
-                  <div className="flex items-center justify-between gap-1 text-[11px]">
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] border truncate ${getRoleBadgeColor(char.role)}`}>
+                  <div className="flex items-center justify-between gap-1 text-[10px]">
+                    <span className={`px-1.5 py-0.5 rounded text-[9px] border truncate ${getRoleBadgeColor(char.role)}`}>
                       {char.roleTitle}
                     </span>
-                    {char.role === 'defendant' && (
-                      <span className="text-[10px] text-red-400 font-mono flex items-center gap-0.5 font-bold">
-                        <Flame className="w-3 h-3 text-red-500" />
-                        {stress}%
+                    {/* Pulsing heartbeat state instead of spoiler suspicion percentage! */}
+                    {isDefendant ? (
+                      <span className="text-[10px] text-red-500 animate-pulse font-mono flex items-center gap-0.5 font-bold">
+                        <Heart className="w-3 h-3 text-red-500 fill-red-500 shrink-0" />
+                        <span>تپش قلب</span>
                       </span>
+                    ) : (
+                      <span className="text-[10px] text-stone-400 font-mono">حالت: آماده</span>
                     )}
                   </div>
                 </button>
@@ -235,7 +270,7 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                       {activeChar.roleTitle}
                     </span>
                   </div>
-                  <p className="text-xs text-stone-400">{activeChar.occupation} • نسبت با قربانی: {activeChar.relationToVictim}</p>
+                  <p className="text-xs text-stone-400">{activeChar.occupation} • رابطه با مقتول: {activeChar.relationToVictim}</p>
                 </div>
               </div>
 
@@ -254,7 +289,7 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
                           style={{ width: `${Math.min(100, Math.max(10, currentStress))}%` }}
                         />
                       </div>
-                      <span className="text-xs font-mono font-bold text-stone-200">{currentStress}%</span>
+                      <span className="text-xs font-mono font-bold text-stone-200">نوسانی</span>
                     </div>
                   </div>
                 </div>
@@ -262,9 +297,9 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
             </div>
 
             {/* Trial Speech Scroll Area */}
-            <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-[#0d0e16]/80">
+            <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4 custom-scrollbar bg-[#0d0e16]/85">
               {/* Initial Statement Record */}
-              <div className="p-4 rounded-2xl bg-[#161826] border border-stone-800 text-xs text-stone-300 space-y-1.5 shadow-sm">
+              <div className="p-4 rounded-2xl bg-[#161826]/80 border border-stone-800/80 text-xs text-stone-300 space-y-1.5 shadow-sm">
                 <span className="text-amber-400 font-bold block">متن اظهارات اولیه ثبت‌شده در محضر دادگاه:</span>
                 <p className="italic text-stone-300/90 leading-relaxed font-serif">
                   «{activeChar.initialStatement}»
@@ -274,21 +309,34 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
               {messages.length === 0 && (
                 <div className="text-center py-14 text-stone-500 text-xs md:text-sm space-y-2">
                   <Mic className="w-8 h-8 mx-auto text-stone-600 animate-pulse" />
-                  <p>شخص در تریبون استیضاح سوگند یاد کرده است. سوال خود را مطرح کنید یا مدرکی جهت مواجهه ارائه دهید.</p>
+                  <p>شخص در تایید اظهارات سوگند یاد کرده است. سوال خود را مطرح کنید یا مدرکی جهت مواجهه ارائه دهید.</p>
                 </div>
               )}
 
-              {/* Live Dialogue Exchange */}
+              {/* Live Dialogue Exchange - Unified Group Chat Stream! */}
               {messages.map((msg) => {
                 const isJudge = msg.sender === 'judge';
                 const isLawyer = msg.sender === 'lawyer';
+                const isDispute = msg.sender === 'dispute_character';
 
                 if (isLawyer) {
                   return (
-                    <div key={msg.id} className="p-3.5 rounded-2xl bg-blue-950/30 border border-blue-600/40 text-xs text-blue-200 space-y-1 my-2 shadow-md animate-in slide-in-from-left duration-200">
+                    <div key={msg.id} className="p-3.5 rounded-2xl bg-blue-950/20 border border-blue-600/40 text-xs text-blue-200 space-y-1 my-2 shadow-md animate-in slide-in-from-left duration-200">
                       <span className="font-bold flex items-center gap-1.5 text-blue-400">
                         <ShieldAlert className="w-4 h-4" />
                         اعتراض رسمی وکیل مدافع ({msg.senderName}):
+                      </span>
+                      <p className="leading-relaxed font-serif">{msg.text}</p>
+                    </div>
+                  );
+                }
+
+                if (isDispute) {
+                  return (
+                    <div key={msg.id} className="p-3.5 rounded-2xl bg-red-950/20 border border-red-500/40 text-xs text-red-200 space-y-1 my-2 shadow-md animate-in slide-in-from-left duration-200">
+                      <span className="font-bold flex items-center gap-1.5 text-red-400">
+                        <Flame className="w-4 h-4 text-red-500 animate-pulse shrink-0" />
+                        مداخله عصبی متهم ({msg.senderName}):
                       </span>
                       <p className="leading-relaxed font-serif">{msg.text}</p>
                     </div>
@@ -350,156 +398,165 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Selected Evidence Pill */}
-            {selectedEvidenceToConfront && (
-              <div className="px-4 py-2 bg-amber-950/40 border-t border-amber-700/50 flex items-center justify-between text-xs text-amber-200">
-                <span className="flex items-center gap-2">
-                  <FileSearch className="w-4 h-4 text-amber-400" />
-                  مدرک پیوست‌شده جهت به چالش کشیدن: <strong>{selectedEvidenceToConfront.title}</strong>
-                </span>
+            {/* Trial Action Board & Input Form */}
+            <div className="p-4 bg-[#141624] border-t border-stone-800 space-y-3 shrink-0">
+              {/* Quick Questions & Heated Dispute manual triggers */}
+              <div className="flex flex-wrap items-center gap-2">
+                {quickQuestions.map((q, idx) => (
+                  <button
+                    key={idx}
+                    disabled={isLoading || isDisputeActive}
+                    onClick={() => {
+                      setInputText(q);
+                      soundManager.playPaperRustle();
+                    }}
+                    className="text-[11px] px-3 py-1.5 rounded-lg bg-stone-900/90 hover:bg-stone-850 text-stone-300 hover:text-amber-300 border border-stone-800 transition-colors cursor-pointer text-right truncate max-w-[240px] disabled:opacity-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+
+                {/* Heated Dispute Manual Trigger Button */}
                 <button
-                  onClick={() => setSelectedEvidenceToConfront(null)}
-                  className="text-stone-400 hover:text-stone-200 text-xs underline cursor-pointer"
+                  onClick={onTriggerDispute}
+                  disabled={isDisputeActive || isDisputeLoading}
+                  className="text-[11px] px-3.5 py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/50 text-red-300 hover:text-red-200 border border-red-650/40 transition-colors cursor-pointer flex items-center gap-1 shadow disabled:opacity-40"
+                  title="مرافعه لفظی شدید بین متهمان ایجاد کنید"
                 >
-                  لغو پیوست
+                  <Flame className="w-3.5 h-3.5 text-red-400 animate-pulse shrink-0" />
+                  <span>{isDisputeLoading ? 'درحال ایجاد مرافعه...' : '🔥 جرقه درگیری لفظی متهمان'}</span>
                 </button>
               </div>
-            )}
 
-            {/* Interrogation Input Form */}
-            <form onSubmit={handleSend} className="p-3 md:p-4 bg-[#141622] border-t border-stone-800 space-y-2">
-              <div className="flex items-center gap-2">
+              {/* Chat Form */}
+              <form onSubmit={handleSend} className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    soundManager.playPaperRustle();
-                    setShowEvidenceSelector(!showEvidenceSelector);
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                  onClick={() => setShowEvidenceSelector(!showEvidenceSelector)}
+                  disabled={isDisputeActive}
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                     selectedEvidenceToConfront
-                      ? 'bg-amber-600 text-stone-900 border-amber-500 font-bold'
-                      : 'bg-[#1b1e2c] hover:bg-[#222638] text-amber-300 border-amber-600/30'
-                  }`}
-                  title="مواجهه متهم با مدارک ضبط‌شده"
+                      ? 'bg-amber-600 border-amber-500 text-stone-950 shadow shadow-amber-500/20'
+                      : 'bg-stone-900 border-stone-800 text-stone-300 hover:bg-stone-850'
+                  } ${isDisputeActive ? 'opacity-40 cursor-not-allowed' : ''}`}
                 >
-                  <FileSearch className="w-4 h-4" />
-                  <span className="hidden sm:inline">ارائه مدرک</span>
+                  <FileSearch className="w-4 h-4 shrink-0" />
+                  <span>
+                    {selectedEvidenceToConfront ? `مدرک پیوست شده (${selectedEvidenceToConfront.id})` : 'پیوست مدرک جرم'}
+                  </span>
                 </button>
 
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
+                  disabled={isLoading || isDisputeActive}
                   placeholder={
-                    selectedEvidenceToConfront
-                      ? `سوال یا مواجهه قضایی درباره «${selectedEvidenceToConfront.title}»...`
-                      : 'سوال، تذکر یا اتهام خود را در محضر دادگاه بیان کنید...'
+                    isDisputeActive
+                      ? '⚠️ درگیری لفظی فعال است! چکش قاضی را بکوبید تا متهمان را ساکت کنید.'
+                      : 'سوال حقوقی خود را از شخص حاضر در تریبون بپرسید یا مدرکی پیوست کنید...'
                   }
-                  disabled={isLoading}
-                  className="flex-1 bg-[#0f1118] border border-stone-700 rounded-xl px-4 py-2.5 text-xs md:text-sm text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-stone-950 text-stone-200 text-xs md:text-sm border border-stone-800/80 focus:border-amber-500 focus:outline-none transition-colors disabled:opacity-60"
                 />
 
                 <button
                   type="submit"
-                  disabled={isLoading || (!inputText.trim() && !selectedEvidenceToConfront)}
-                  className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-900 font-bold text-xs md:text-sm shadow-lg shadow-amber-900/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  disabled={isLoading || isDisputeActive || (!inputText.trim() && !selectedEvidenceToConfront)}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-extrabold text-xs md:text-sm shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40 shrink-0"
                 >
-                  <Send className="w-4 h-4" />
-                  <span className="hidden md:inline mr-1.5">طرح سوال</span>
+                  <span>استنطاق</span>
+                  <Send className="w-3.5 h-3.5" />
                 </button>
-              </div>
+              </form>
+            </div>
+          </div>
 
-              {/* Quick Evidence Picker Drawer */}
-              {showEvidenceSelector && (
-                <div className="p-3 rounded-xl bg-[#0e1017] border border-stone-800 space-y-2 animate-in fade-in duration-150">
-                  <span className="text-[11px] text-amber-400 font-medium block">
-                    یک مدرک را برای مواجهه و به دام انداختن متهم انتخاب کنید:
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto custom-scrollbar">
-                    {caseData.evidence.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
+          {/* Right Sidebar: Evidence Selector Drawer & Suspect Profile Detail (4 cols) */}
+          <div className="lg:col-span-4 flex flex-col gap-4">
+            {/* Show Evidence Selector Overlay in place if active */}
+            {showEvidenceSelector && (
+              <div className="bg-[#121420] border border-amber-900/40 rounded-3xl p-5 shadow-2xl flex-1 flex flex-col justify-between animate-in slide-in-from-right duration-250">
+                <div>
+                  <div className="flex items-center justify-between border-b border-stone-800 pb-2.5">
+                    <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                      <FileSearch className="w-4 h-4" />
+                      انتخاب مدرک جرم جهت مواجهه:
+                    </span>
+                    <button
+                      onClick={() => setShowEvidenceSelector(false)}
+                      className="text-stone-400 hover:text-stone-200 text-xs"
+                    >
+                      بستن کشو
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 mt-4 max-h-[420px] overflow-y-auto custom-scrollbar pr-1">
+                    {caseData.evidence.map((ev) => (
+                      <div
+                        key={ev.id}
                         onClick={() => {
                           soundManager.playPaperRustle();
-                          setSelectedEvidenceToConfront(item);
+                          setSelectedEvidenceToConfront(ev);
                           setShowEvidenceSelector(false);
                         }}
-                        className="p-2.5 rounded-xl bg-[#161824] hover:bg-[#1f2233] border border-stone-850 hover:border-amber-500/40 text-right text-xs transition-colors cursor-pointer"
+                        className={`p-3 rounded-xl border text-right transition-all cursor-pointer ${
+                          selectedEvidenceToConfront?.id === ev.id
+                            ? 'bg-amber-950/40 border-amber-500 text-amber-200'
+                            : 'bg-[#171926] border-stone-850 hover:bg-[#1f2233] text-stone-300'
+                        }`}
                       >
-                        <span className="font-semibold text-stone-200 block truncate">{item.title}</span>
-                        <span className="text-[10px] text-stone-400 block truncate">{item.foundAt}</span>
-                      </button>
+                        <h4 className="text-xs font-bold">{ev.title}</h4>
+                        <p className="text-[10px] text-stone-400 truncate mt-1">کشف در: {ev.foundAt}</p>
+                      </div>
                     ))}
                   </div>
                 </div>
-              )}
-            </form>
-          </div>
 
-          {/* Tactical Sidebar: Questions & Gavel (4 cols) */}
-          <div className="lg:col-span-4 space-y-4">
-            {/* Quick Questions */}
-            <div className="bg-[#12141f]/90 backdrop-blur-md border border-stone-800 rounded-2xl p-5 shadow-xl space-y-3">
-              <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                سوالات تاکتیکی و قضایی پیشنهادی:
-              </h4>
-              <div className="space-y-2">
-                {quickQuestions.map((q, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setInputText(q)}
-                    className="w-full text-right p-2.5 rounded-xl bg-[#181a26] hover:bg-[#202434] border border-stone-800 hover:border-amber-500/30 text-xs text-stone-300 hover:text-amber-200 transition-colors cursor-pointer leading-relaxed"
-                  >
-                    {q}
-                  </button>
-                ))}
+                <div className="pt-4 border-t border-stone-800 mt-4 text-[11px] text-stone-400">
+                  پس از انتخاب مدرک، سوال خود را ارسال کنید تا شخص درباره نحوه ارتباط خود با مدرک توضیح دهد.
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Suspect Psychology & Bio */}
-            <div className="bg-[#12141f]/90 backdrop-blur-md border border-stone-800 rounded-2xl p-5 shadow-xl space-y-3">
-              <div className="flex items-center justify-between border-b border-stone-800 pb-2.5">
-                <span className="text-xs font-bold text-stone-200">روانشناسی متهم/شاهد</span>
-                <span className={`text-[11px] px-2 py-0.5 rounded border ${getRoleBadgeColor(activeChar.role)}`}>
-                  {activeChar.roleTitle}
-                </span>
-              </div>
+            {!showEvidenceSelector && (
+              <>
+                {/* Active summoned person background sheet */}
+                <div className="bg-[#12141f]/95 border border-stone-800/90 rounded-3xl p-5 shadow-xl space-y-4">
+                  <div className="border-b border-stone-800 pb-3 flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                    <h3 className="font-bold text-amber-100 text-xs">پرونده شخص حاضر در تریبون:</h3>
+                  </div>
 
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-stone-400 block mb-0.5">وضعیت رفتاری:</span>
-                  <p className="text-stone-300 bg-[#171926] p-2.5 rounded-xl border border-stone-800 leading-relaxed">
-                    {activeChar.personality}
-                  </p>
+                  <div className="space-y-2.5 text-xs text-stone-300 leading-relaxed bg-[#171925] p-4 rounded-2xl border border-stone-850 shadow-inner">
+                    <p><strong className="text-amber-400">نام متهم/شاهد:</strong> {activeChar.name}</p>
+                    <p><strong className="text-amber-400">شغل رسمی:</strong> {activeChar.occupation}</p>
+                    <p><strong className="text-amber-400">سن:</strong> {activeChar.age} سال</p>
+                    <p><strong className="text-amber-400">رابطه با قربانی:</strong> {activeChar.relationToVictim}</p>
+                    <p className="pt-2 border-t border-stone-800"><strong className="text-amber-400">روانشناسی کاراکتر:</strong> {activeChar.personality}</p>
+                  </div>
+
+                  <div className="bg-amber-950/20 border border-amber-600/30 p-3.5 rounded-2xl text-[11px] leading-relaxed text-amber-200">
+                    <strong className="block mb-1">💡 راهنمای قاضی:</strong>
+                    شاهدان و وکلای مدافع معمولاً راستگو هستند، اما در صورت اثبات تناقض با مدارک علمی پزشکی قانونی، متهمین مجبور به اعتراف یا خطای کلامی خواهند شد.
+                  </div>
                 </div>
 
-                {activeChar.role === 'defendant' && (
-                  <div>
-                    <span className="text-stone-400 block mb-0.5 font-medium">ترفند فریبکاری احتمالی:</span>
-                    <p className="text-amber-200/90 bg-amber-950/30 p-2.5 rounded-xl border border-amber-800/30 leading-relaxed">
-                      متهم با تمام توان سعی دارد حضور خود را انکار و پرونده را تصادف یا کار دیگران جلوه دهد.
-                    </p>
+                {/* Autopsy quick panel reference */}
+                <div className="bg-[#12141f]/95 border border-stone-800/90 rounded-3xl p-5 shadow-xl space-y-2.5">
+                  <div className="border-b border-stone-800 pb-2.5 flex items-center gap-2">
+                    <Skull className="w-4 h-4 text-red-400 shrink-0" />
+                    <h3 className="font-bold text-red-200 text-xs">گزارش پزشکی قانونی (مرجع علمی):</h3>
                   </div>
-                )}
-              </div>
-
-              {/* Courtroom Gavel Action */}
-              <div className="pt-2 border-t border-stone-800">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundManager.playGavel();
-                    onGavelClick();
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-stone-900 to-stone-850 hover:from-amber-950/40 hover:to-stone-800 border border-stone-700 text-stone-300 hover:text-amber-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow active:scale-98"
-                >
-                  <Gavel className="w-4 h-4 text-amber-500" />
-                  <span>کوبیدن چکش نظم (سکوت در صحن دادگاه!)</span>
-                </button>
-              </div>
-            </div>
+                  <div className="text-xs text-stone-400 space-y-1 bg-[#171925] p-3 rounded-xl border border-stone-850">
+                    <p><strong className="text-stone-300">علت فوت:</strong> {caseData.autopsyReport.causeOfDeath}</p>
+                    <p><strong className="text-stone-300">زمان مرگ:</strong> {caseData.autopsyReport.timeOfDeath}</p>
+                  </div>
+                  <p className="text-[10px] text-stone-400 italic">
+                    {caseData.autopsyReport.coronerNotes}
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

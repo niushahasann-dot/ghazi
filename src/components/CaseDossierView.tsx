@@ -12,7 +12,8 @@ import {
   Search,
   Sparkles,
   ChevronLeft,
-  FileCheck2
+  FileCheck2,
+  Users
 } from 'lucide-react';
 import { CaseDossier, EvidenceItem, Character } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
@@ -126,7 +127,7 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
         </div>
       </div>
 
-      {/* Grid: 2 Columns (Left: Case Incident & Autopsy, Right: Evidence & Characters) */}
+      {/* Grid: 2 Columns (Left: Case Incident & Autopsy, Right: Evidence) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Dossier Report & Autopsy (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
@@ -211,97 +212,120 @@ export const CaseDossierView: React.FC<CaseDossierViewProps> = ({
           </div>
         </div>
 
-        {/* Right Column: Evidence & Summon Characters (5 cols) */}
+        {/* Right Column: Evidence Dossier Shelf (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Evidence Dossier Shelf */}
-          <div className="rounded-2xl bg-[#141622] border border-stone-800/80 p-6 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-base">
-                <Search className="w-5 h-5 text-amber-400" />
-                <h3>شواهد و مدارک ضبط‌شده ({caseData.evidence.length})</h3>
+          <div className="rounded-2xl bg-[#141622] border border-stone-800/80 p-6 shadow-xl space-y-4 h-full flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+                <div className="flex items-center gap-2 text-amber-400 font-bold text-base">
+                  <Search className="w-5 h-5 text-amber-400" />
+                  <h3>شواهد و مدارک ضبط‌شده ({caseData.evidence.length})</h3>
+                </div>
+                <span className="text-xs text-stone-400">بررسی جزئیات</span>
               </div>
-              <span className="text-xs text-stone-400">کلیک برای بازبینی جزئیات</span>
-            </div>
 
-            <div className="space-y-3">
-              {caseData.evidence.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    soundManager.playPaperRustle();
-                    setInspectedEvidence(item);
-                  }}
-                  className="group p-3.5 rounded-xl bg-[#191c28] hover:bg-[#202434] border border-stone-800 hover:border-amber-500/40 transition-all cursor-pointer shadow-sm"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-sm font-bold text-stone-200 group-hover:text-amber-300 transition-colors">
-                      {item.title}
-                    </h4>
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-stone-800 text-stone-400">
-                      #{item.id}
-                    </span>
-                  </div>
-                  <p className="text-xs text-stone-400 line-clamp-2 mt-1.5">
-                    {item.description}
-                  </p>
-                  <div className="mt-2.5 flex items-center justify-between text-xs text-amber-400/80">
-                    <span className="truncate max-w-[200px]">کشف در: {item.foundAt}</span>
-                    <span className="flex items-center gap-1 group-hover:underline">
-                      <Eye className="w-3.5 h-3.5" />
-                      بررسی
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Persons in Court */}
-          <div className="rounded-2xl bg-[#141622] border border-stone-800/80 p-6 shadow-xl space-y-4">
-            <div className="flex items-center gap-2 text-amber-400 font-bold text-base border-b border-stone-800 pb-3">
-              <User className="w-5 h-5 text-amber-400" />
-              <h3>اشخاص حاضر در جلسه دادگاه</h3>
-            </div>
-
-            <div className="space-y-3">
-              {caseData.characters.map((char) => (
-                <div
-                  key={char.id}
-                  className="p-3.5 rounded-xl bg-[#191c28] border border-stone-800 hover:border-amber-500/30 transition-all space-y-2.5"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-sm font-bold text-stone-100">{char.name}</span>
-                      <span className="text-xs text-stone-400 mr-2 font-mono">({char.age} ساله)</span>
+              <div className="space-y-3 mt-4">
+                {caseData.evidence.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      soundManager.playPaperRustle();
+                      setInspectedEvidence(item);
+                    }}
+                    className="group p-3.5 rounded-xl bg-[#191c28] hover:bg-[#202434] border border-stone-800 hover:border-amber-500/40 transition-all cursor-pointer shadow-sm"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-sm font-bold text-stone-200 group-hover:text-amber-300 transition-colors">
+                        {item.title}
+                      </h4>
+                      <span className="text-[11px] px-2 py-0.5 rounded bg-stone-800 text-stone-400">
+                        #{item.id}
+                      </span>
                     </div>
-                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${getRoleBadge(char.role)}`}>
-                      {char.roleTitle}
-                    </span>
+                    <p className="text-xs text-stone-400 line-clamp-2 mt-1.5">
+                      {item.description}
+                    </p>
+                    <div className="mt-2.5 flex items-center justify-between text-xs text-amber-400/80">
+                      <span className="truncate max-w-[180px] text-stone-400">کشف در: {item.foundAt}</span>
+                      <span className="flex items-center gap-1 group-hover:underline">
+                        <Eye className="w-3.5 h-3.5" />
+                        بررسی مدرک
+                      </span>
+                    </div>
                   </div>
-
-                  <p className="text-xs text-stone-400">
-                    <strong className="text-stone-300">نسبت/شغل:</strong> {char.relationToVictim} ({char.occupation})
-                  </p>
-
-                  <div className="pt-2 flex items-center justify-between border-t border-stone-800/60">
-                    <span className="text-xs text-stone-400">
-                      سوءظن اولیه: <strong className="text-amber-400 font-mono">{char.suspicionLevel}%</strong>
-                    </span>
-                    <button
-                      onClick={() => {
-                        soundManager.playGavel();
-                        onSelectCharacterForCourt(char.id);
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 hover:text-amber-200 text-xs font-semibold border border-amber-500/30 transition-colors cursor-pointer"
-                    >
-                      <span>احضار به جایگاه</span>
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 p-3 rounded-xl bg-[#181a26]/60 border border-stone-800 text-stone-400 text-xs">
+              💡 روی هر مدرک کلیک کنید تا شناسنامه آزمایشگاه جنایی و میزان تطابق آن با ادعای متهمان را مشاهده کنید.
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Full Width Bottom Section: Persons in Court (Clean dynamic layout grid for UNRESTRICTED numbers of characters!) */}
+      <div className="rounded-3xl bg-[#11131e] border border-stone-800/80 p-6 md:p-8 shadow-2xl space-y-6">
+        <div className="flex items-center justify-between border-b border-stone-800 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <Users className="w-6 h-6 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-lg md:text-xl font-extrabold text-amber-100">احضار و استنطاق اشخاص حاضر در پرونده ({caseData.characters.length} نفر)</h3>
+              <p className="text-xs text-stone-400">کارآگاهان آگاهی اظهارات اولیه این اشخاص را ثبت کرده‌اند. یکی را برای بازجویی حضوری احضار کنید:</p>
+            </div>
+          </div>
+          <span className="text-xs text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+            طراحی پویا
+          </span>
+        </div>
+
+        {/* Highly responsive layout grid that handles any number of character cards dynamically without breaking! */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {caseData.characters.map((char) => (
+            <div
+              key={char.id}
+              className="group rounded-2xl bg-[#161826] border border-stone-800/80 hover:border-amber-500/40 p-5 transition-all duration-300 flex flex-col justify-between space-y-4 shadow-xl hover:-translate-y-1"
+            >
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="truncate">
+                    <span className="text-base font-extrabold text-stone-100 block group-hover:text-amber-200 transition-colors truncate">{char.name}</span>
+                    <span className="text-xs text-stone-400 font-mono">({char.age} ساله)</span>
+                  </div>
+                  <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border shrink-0 ${getRoleBadge(char.role)}`}>
+                    {char.roleTitle}
+                  </span>
+                </div>
+
+                <div className="space-y-1 text-xs text-stone-300 bg-[#10121d] p-3 rounded-xl border border-stone-850">
+                  <p className="truncate"><strong className="text-stone-400">شغل:</strong> {char.occupation}</p>
+                  <p className="truncate"><strong className="text-stone-400">رابطه با مقتول:</strong> {char.relationToVictim}</p>
+                </div>
+
+                <div className="text-xs text-stone-400 leading-relaxed italic line-clamp-3">
+                  {char.initialStatement}
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-stone-800/80 flex items-center justify-between">
+                <span className="text-[11px] text-stone-400 bg-stone-900 px-2 py-1 rounded">
+                  وضعیت: منتظر استنطاق
+                </span>
+                
+                <button
+                  onClick={() => {
+                    soundManager.playGavel();
+                    onSelectCharacterForCourt(char.id);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600/10 hover:bg-amber-600/30 text-amber-300 hover:text-amber-200 text-xs font-bold border border-amber-500/30 transition-all cursor-pointer shadow-md"
+                >
+                  <span>احضار به جایگاه شهود</span>
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

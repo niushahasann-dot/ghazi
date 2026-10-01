@@ -15,18 +15,26 @@ export default function App() {
   const [currentView, setCurrentView] = useState<'menu' | 'consult' | 'game'>('menu');
   const [currentTab, setCurrentTab] = useState<'dossier' | 'court' | 'verdict' | 'consult'>('court');
 
-  // No case is loaded initially
+  // Case loaded
   const [caseData, setCaseData] = useState<CaseDossier | null>(null);
   const [presetCases, setPresetCases] = useState<CaseDossier[]>(PRESET_CASES);
 
   const [activeCharacterId, setActiveCharacterId] = useState<string>('');
   const [characterStressMap, setCharacterStressMap] = useState<Record<string, number>>({});
-  const [dialogueHistory, setDialogueHistory] = useState<Record<string, InterrogationMessage[]>>({});
+  
+  // Single Unified Group Chat stream for all courtroom dialogue Sequential Log!
+  const [courtroomMessages, setCourtroomMessages] = useState<InterrogationMessage[]>([]);
+  
   const [selectedEvidenceToConfront, setSelectedEvidenceToConfront] = useState<EvidenceItem | null>(null);
   const [isVerdictModalOpen, setIsVerdictModalOpen] = useState(false);
   const [gavelAnimating, setGavelAnimating] = useState(false);
   const [isSoundOn, setIsSoundOn] = useState(true);
   const [isInterrogating, setIsInterrogating] = useState(false);
+
+  // Heated Dispute states
+  const [isDisputeActive, setIsDisputeActive] = useState(false);
+  const [isDisputeLoading, setIsDisputeLoading] = useState(false);
+  const [disputeTimeoutIds, setDisputeTimeoutIds] = useState<number[]>([]);
 
   // Initialize presets on mount from server if available
   useEffect(() => {
@@ -52,30 +60,115 @@ export default function App() {
         initialMap[c.id] = c.suspicionLevel;
       });
       setCharacterStressMap(initialMap);
-      setDialogueHistory({});
+      setCourtroomMessages([]);
       setSelectedEvidenceToConfront(null);
+      setIsDisputeActive(false);
+      setIsDisputeLoading(false);
+      disputeTimeoutIds.forEach((id) => clearTimeout(id));
+      setDisputeTimeoutIds([]);
     }
   }, [caseData]);
 
-  // Gavel Strike Event
+  // Clean timeouts on unmount
+  useEffect(() => {
+    return () => {
+      disputeTimeoutIds.forEach((id) => clearTimeout(id));
+    };
+  }, [disputeTimeoutIds]);
+
+  // Gavel Strike Event - Can silence heated disputes!
   const handleGavelClick = () => {
     soundManager.playGavel();
     setGavelAnimating(true);
     setTimeout(() => setGavelAnimating(false), 800);
 
-    // If in courtroom, add an order in court system notice
-    if (currentView === 'game' && currentTab === 'court' && caseData && activeCharacterId) {
-      const gavelMsg: InterrogationMessage = {
+    // If a Heated Dispute is currently active, stop it!
+    if (isDisputeActive) {
+      // Clear all pending dispute timeouts
+      disputeTimeoutIds.forEach((id) => clearTimeout(id));
+      setDisputeTimeoutIds([]);
+      setIsDisputeActive(false);
+
+      const gavelOrderMsg: InterrogationMessage = {
+        id: `gavel-order-${Date.now()}`,
+        sender: 'judge',
+        senderName: 'ریاست محترم دادگاه (ضربه چکش)',
+        text: '«سکوت! سکوت در صحن دادگاه! مرافعه خاتمه یابد و متهمین فوراً روی صندلی‌های خود مستقر شوند. در غیر این صورت به جرم اخلال در نظم دادرسی برخورد شدید قانونی خواهد شد!»',
+        timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+      };
+      setCourtroomMessages((prev) => [...prev, gavelOrderMsg]);
+      return;
+    }
+
+    // Standard gavel announcement if no dispute is active
+    if (currentView === 'game' && currentTab === 'court' && caseData) {
+      const standardMsg: InterrogationMessage = {
         id: `gavel-${Date.now()}`,
         sender: 'judge',
         senderName: 'ریاست دادگاه (ضربه چکش)',
         text: '«سکوت و نظم در دادگاه! اظهارات صریح و بدون حاشیه بیان شود!»',
         timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
       };
-      setDialogueHistory((prev) => ({
-        ...prev,
-        [activeCharacterId]: [...(prev[activeCharacterId] || []), gavelMsg],
-      }));
+      setCourtroomMessages((prev) => [...prev, standardMsg]);
+    }
+  };
+
+  // Trigger a dynamic heated verbal dispute back-and-forth between suspects
+  const triggerHeatedDispute = async () => {
+    if (!caseData || isDisputeActive || isDisputeLoading) return;
+    setIsDisputeLoading(true);
+    soundManager.playDramaticSting();
+
+    try {
+      const lastMsg = courtroomMessages[courtroomMessages.length - 1]?.text || '';
+      const response = await fetch('/api/generate-argument', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseData,
+          lastExchange: lastMsg,
+        }),
+      });
+      const data = await response.json();
+      const lines = data.argument?.argument || data.argument || [];
+
+      if (Array.isArray(lines) && lines.length > 0) {
+        setIsDisputeActive(true);
+        setIsDisputeLoading(false);
+
+        // Queue lines to be posted one-by-one every 3 seconds
+        const timeouts: number[] = [];
+        lines.forEach((line: any, index: number) => {
+          const timeoutId = window.setTimeout(() => {
+            // Only add if dispute is still active
+            setIsDisputeActive((active) => {
+              if (active) {
+                if (index % 2 === 0) {
+                  soundManager.playObjection();
+                } else {
+                  soundManager.playPaperRustle();
+                }
+                const disputeMsg: InterrogationMessage = {
+                  id: `dispute-${Date.now()}-${index}`,
+                  sender: 'dispute_character',
+                  senderName: line.senderName,
+                  text: line.text,
+                  timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+                };
+                setCourtroomMessages((prev) => [...prev, disputeMsg]);
+              }
+              return active;
+            });
+          }, (index + 1) * 3200);
+          timeouts.push(timeoutId);
+        });
+        setDisputeTimeoutIds(timeouts);
+      } else {
+        setIsDisputeLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setIsDisputeLoading(false);
     }
   };
 
@@ -110,12 +203,8 @@ export default function App() {
       timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // Append judge message immediately
-    const charMessages = dialogueHistory[activeChar.id] || [];
-    setDialogueHistory((prev) => ({
-      ...prev,
-      [activeChar.id]: [...charMessages, judgeMsg],
-    }));
+    // Append judge message to unified courtroom log
+    setCourtroomMessages((prev) => [...prev, judgeMsg]);
 
     try {
       const response = await fetch('/api/interrogate', {
@@ -126,7 +215,7 @@ export default function App() {
           characterId: activeChar.id,
           question: text,
           evidencePresentedId: evidenceId,
-          history: charMessages.map((m) => ({
+          history: courtroomMessages.map((m) => ({
             sender: m.senderName,
             text: m.text,
           })),
@@ -146,10 +235,7 @@ export default function App() {
           text: data.lawyerIntervention,
           timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
         };
-        setDialogueHistory((prev) => ({
-          ...prev,
-          [activeChar.id]: [...(prev[activeChar.id] || []), lawyerMsg],
-        }));
+        setCourtroomMessages((prev) => [...prev, lawyerMsg]);
       }
 
       // Update stress
@@ -180,13 +266,10 @@ export default function App() {
         timestamp: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
       };
 
-      setDialogueHistory((prev) => ({
-        ...prev,
-        [activeChar.id]: [...(prev[activeChar.id] || []), characterReplyMsg],
-      }));
+      setCourtroomMessages((prev) => [...prev, characterReplyMsg]);
     } catch (err) {
       console.error(err);
-    } finally {
+    } {
       setIsInterrogating(false);
     }
   };
@@ -248,10 +331,9 @@ export default function App() {
         />
       )}
 
-      {/* 2. Dedicated Standalone Consultation & Design Room (ONLY this page is shown!) */}
+      {/* 2. Dedicated Standalone Consultation & Design Room */}
       {currentView === 'consult' && (
         <div className="min-h-screen flex flex-col bg-[#0b0c14]">
-          {/* Focused Top Bar without distracting tabs */}
           <header className="sticky top-0 z-40 bg-[#0f111c]/95 backdrop-blur-md border-b border-amber-900/40 px-4 py-3 flex items-center justify-between shadow-xl">
             <div className="flex items-center gap-3">
               <button
@@ -288,7 +370,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 3. In-Session Game View (Enters directly to Courtroom upon case finalization) */}
+      {/* 3. In-Session Game View */}
       {currentView === 'game' && caseData && (
         <div className="flex flex-col min-h-screen">
           {/* Top Navbar */}
@@ -314,7 +396,7 @@ export default function App() {
                 caseData={caseData}
                 activeCharacterId={activeCharacterId}
                 onSelectCharacter={(charId) => setActiveCharacterId(charId)}
-                messages={dialogueHistory[activeCharacterId] || []}
+                messages={courtroomMessages}
                 onSendMessage={handleSendMessage}
                 isLoading={isInterrogating}
                 onGavelClick={handleGavelClick}
@@ -323,6 +405,9 @@ export default function App() {
                 setSelectedEvidenceToConfront={setSelectedEvidenceToConfront}
                 onOpenDossier={() => setCurrentTab('dossier')}
                 onOpenVerdict={() => setIsVerdictModalOpen(true)}
+                isDisputeActive={isDisputeActive}
+                isDisputeLoading={isDisputeLoading}
+                onTriggerDispute={triggerHeatedDispute}
               />
             )}
 

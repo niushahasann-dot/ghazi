@@ -545,12 +545,9 @@ async function startServer() {
    - یک عنوان جذاب و طبیعی خلق کنید (مثال: به جای "پرونده موضوع قتل بازیکن فوتبال"، بنویسید "راز مقتول در رختکن استادیوم آزادی").
    - تمام اسامی، مشاغل، محل وقوع جرم، گزارش کالبدشکافی و مدارک باید مانند یک پرونده واقعی قضایی با داستان‌نویسی روان و مهیج فارسی نگاشته شوند.
 
-۲. اشخاص چالش‌برانگیز (۵ تا ۶ شخص):
+۲. اشخاص چالش‌برانگیز (هر تعدادی که داستان نیاز دارد، به انتخاب خودتان بین ۳ تا ۹ نفر):
    - متهم ردیف اول (defendant): با استراتژی دروغین (deceptionStrategy) و الایبی محکم اما متناقض.
-   - متهم ردیف دوم یا مظنون دیگر (defendant/witness): دارای انگیزه شخصی یا مالی پنهان.
-   - شاکی (plaintiff): دارای ادعا و خصومت قبلی.
-   - کارشناس رسمی/پزشک (expert): با اسناد پزشکی قانونی دقیق.
-   - شاهد کلیدی (witness): که نقطه تناقض متهم را دیده است.
+   - سایرین بر اساس نیاز داستان نظیر متهم ردیف دوم یا سوم، شاکی (plaintiff)، کارشناس (expert)، یا شهود کلیدی (witness) با روابط نزدیک یا دشمنی شخصی با قربانی یا متهمین.
 
 ۳. مدارک و حقیقت پنهان:
    - ۴ تا ۶ مدرک فیزیکی، پزشکی قانونی و دیجیتال.
@@ -619,6 +616,64 @@ async function startServer() {
       console.error('Error generating case via Gemini:', error);
       const bespokeCase = generateProceduralCase(requestedTopic);
       res.json(bespokeCase);
+    }
+  });
+
+  // Dynamic Heated Verbal Argument Generator
+  app.post('/api/generate-argument', async (req: Request, res: Response) => {
+    const { caseData, lastExchange } = req.body;
+
+    if (!ai) {
+      // Offline fallback argument
+      const c1 = caseData?.characters?.[0] || { name: 'متهم اول' };
+      const c2 = caseData?.characters?.[1] || { name: 'متهم دوم' };
+      return res.json({
+        argument: [
+          { senderName: c1.name, text: 'جناب قاضی، این آقا دارد کاملاً دروغ می‌گوید تا خودش را تبرئه کند!' },
+          { senderName: c2.name, text: 'خفه شو! خودت آن شب کلید گاوصندوق را برداشتی و دوربین‌ها را خاموش کردی!' },
+          { senderName: c1.name, text: 'تهمت نزن بی‌شرف! مدارک ردیابی موبایلت در نیاوران کاملاً ثبت شده است!' }
+        ]
+      });
+    }
+
+    try {
+      const chars = caseData.characters || [];
+      const charDetails = chars.map((c: Character) => `${c.name} (${c.roleTitle}) - روحیات: ${c.personality}`).join('\n');
+
+      const prompt = `شما کارگردان تئاتر قضایی برای بازی «آقای قاضی» هستید.
+یک درگیری و مرافعه لفظی شدید و انفجاری بین شخصیت‌های دادگاه نیاز داریم.
+شخصیت‌های موجود در دادگاه:
+${charDetails}
+
+موضوع پرونده:
+${caseData.title} | ${caseData.briefing}
+
+آخرین صحبت رد و بدل شده در دادگاه: "${lastExchange || 'صحبت‌های قبلی اتهام‌زنی شرکا به هم'}"
+
+یک مرافعه لفظی و دعوای داغ بین ۲ الی ۳ نفر از متهمان یا شاکیان (ترجیحاً کسانی که با هم تضاد منافع دارند، مثل متهم ردیف اول و شاهد کلیدی یا شاکی) بنویسید.
+لحن باید بسیار پرخاشگر، عصبی، تند و طبیعی باشد (شامل تهمت زدن به هم، پریدن وسط حرف یکدیگر، قسم خوردن و تپق زدن به خاطر عصبانیت).
+
+خروجی دقیقاً یک آرایه JSON با ساختار زیر باشد (هیچ متن دیگری ارسال نکنید):
+[
+  { "senderName": "نام دقیق کاراکتر اول", "text": "دیالوگ عصبانی اول..." },
+  { "senderName": "نام دقیق کاراکتر دوم", "text": "پاسخ انفجاری دوم و پریدن وسط حرف کاراکتر اول..." },
+  { "senderName": "نام دقیق کاراکتر اول", "text": "اتهام و فریاد متقابل کاراکتر اول..." },
+  { "senderName": "نام دقیق کاراکتر سوم یا دوم", "text": "اعتراض تند بعدی..." }
+]`;
+
+      const resAi = await generateAiContent(prompt, true, 0.9);
+      const argument = parseJsonFromAi<unknown>(resAi.text);
+      res.json({ argument });
+    } catch (error) {
+      console.error('Error generating heated argument:', error);
+      const c1 = caseData?.characters?.[0] || { name: 'متهم اول' };
+      const c2 = caseData?.characters?.[1] || { name: 'متهم دوم' };
+      res.json({
+        argument: [
+          { senderName: c1.name, text: 'جناب قاضی، او سعی دارد تقصیر را گردن من بیندازد در حالی که خودش مسئول اصلی بود!' },
+          { senderName: c2.name, text: 'دروغ نگو! تو خودت آن شب با مقتول ملاقات خصوصی داشتی!' }
+        ]
+      });
     }
   });
 
