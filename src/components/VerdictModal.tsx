@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Gavel,
@@ -47,6 +47,18 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
   const [result, setResult] = useState<VerdictResult | null>(null);
   const [showVerdictSheet, setShowVerdictSheet] = useState(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        soundManager.playPaperRustle();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleIssueVerdict = async (e: React.FormEvent) => {
@@ -74,8 +86,17 @@ export const VerdictModal: React.FC<VerdictModalProps> = ({
   const selectedChar = caseData.characters.find((c) => c.id === selectedAccusedId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-3xl bg-[#12141e] border border-amber-900/40 rounded-3xl shadow-2xl overflow-hidden text-stone-200 max-h-[90vh] flex flex-col">
+    <div
+      onClick={() => {
+        soundManager.playPaperRustle();
+        onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 cursor-pointer select-none"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-3xl bg-[#12141e] border border-amber-900/40 rounded-3xl shadow-2xl overflow-hidden text-stone-200 max-h-[90vh] flex flex-col cursor-default select-text"
+      >
         {/* Top Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#1c1f2e] to-[#151724] border-b border-stone-800">
           <div className="flex items-center gap-3">

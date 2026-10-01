@@ -1,6 +1,7 @@
-import React from 'react';
-import { Printer, Download, Scale, ShieldCheck, X, FileText, CheckCircle, AlertTriangle, Stamp } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Printer, Download, Scale, ShieldCheck, X, FileText, CheckCircle, AlertTriangle, Stamp, ArrowRight } from 'lucide-react';
 import { CaseDossier, VerdictResult } from '../types.ts';
+import { soundManager } from '../utils/audio.ts';
 
 interface OfficialJudicialSheetProps {
   caseData: CaseDossier;
@@ -27,6 +28,19 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
   isOpen,
   onClose,
 }) => {
+  // Listen for Escape key press to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        soundManager.playPaperRustle();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const isIndictment = type === 'indictment';
@@ -38,36 +52,52 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
     window.print();
   };
 
+  const handleCloseClick = () => {
+    soundManager.playPaperRustle();
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
-      <div className="relative w-full max-w-3xl my-auto bg-[#0d0f17] border border-amber-900/60 rounded-2xl shadow-2xl overflow-hidden text-stone-900 flex flex-col max-h-[92vh]">
+    <div
+      onClick={handleCloseClick}
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto select-none cursor-pointer"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-3xl my-auto bg-[#0d0f17] border border-amber-900/60 rounded-2xl shadow-2xl overflow-hidden text-stone-900 flex flex-col max-h-[92vh] cursor-default select-text"
+      >
         {/* Modal Top Control Bar */}
-        <div className="flex items-center justify-between px-5 py-3 bg-[#161826] border-b border-stone-800 text-stone-200 shrink-0 print:hidden">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-amber-400" />
-            <span className="text-xs font-bold text-amber-200">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 bg-[#161826] border-b border-stone-800 text-stone-200 shrink-0 print:hidden gap-3">
+          <div className="flex items-center gap-2 truncate">
+            <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0" />
+            <span className="text-xs sm:text-sm font-bold text-amber-200 truncate">
               {isIndictment ? 'سند رسمی: کیفرخواست دادسرای عمومی و انقلاب' : 'سند رسمی: دادنامه و رای قطعی دادگاه'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-stone-950 font-bold text-xs transition-colors cursor-pointer shadow"
+              title="چاپ یا ذخیره PDF برگه رسمی"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>چاپ / دانلود برگه</span>
+              <span className="hidden sm:inline">چاپ / دانلود برگه</span>
             </button>
+
             <button
-              onClick={onClose}
-              className="p-1 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors cursor-pointer"
+              onClick={handleCloseClick}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-500/40 text-red-200 hover:text-white font-bold text-xs transition-all cursor-pointer shadow"
+              title="بستن این برگه و بازگشت به دادگاه (Esc)"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
+              <span>خروج و بازگشت</span>
             </button>
           </div>
         </div>
 
         {/* Printable Official Document Canvas */}
-        <div className="flex-1 p-6 md:p-10 overflow-y-auto custom-scrollbar bg-[#fcf9f0] print:p-0 print:bg-white text-stone-900 relative selection:bg-amber-200 font-sans">
+        <div className="flex-1 p-5 md:p-8 overflow-y-auto custom-scrollbar bg-[#fcf9f0] print:p-0 print:bg-white text-stone-900 relative selection:bg-amber-200 font-sans">
           {/* Official Watermark background */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none">
             <div className="text-center font-serif text-8xl font-black rotate-[-30deg] tracking-widest text-amber-950">
@@ -76,7 +106,7 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
           </div>
 
           {/* Document Decorative Double Border */}
-          <div className="border-4 border-amber-900/80 p-6 md:p-8 rounded-xl relative bg-gradient-to-b from-[#fffef9] via-[#fdfbf3] to-[#fcf8ec] shadow-inner">
+          <div className="border-4 border-amber-900/80 p-5 md:p-8 rounded-xl relative bg-gradient-to-b from-[#fffef9] via-[#fdfbf3] to-[#fcf8ec] shadow-inner">
             {/* Inner fine border line */}
             <div className="border border-amber-800/40 p-4 rounded-lg space-y-6">
               
@@ -136,7 +166,7 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
                       ۲. گزارش کالبدشکافی و نتایج پزشکی قانونی:
                     </h3>
                     <p className="pr-3">
-                      علت مرگ: <strong>{caseData.autopsyReport.causeOfDeath}</strong> | زمان تقربی: <strong>{caseData.autopsyReport.timeOfDeath}</strong>.
+                      علت مرگ: <strong>{caseData.autopsyReport.causeOfDeath}</strong> | زمان تقریبی: <strong>{caseData.autopsyReport.timeOfDeath}</strong>.
                       {caseData.autopsyReport.coronerNotes}
                     </p>
                   </div>
@@ -229,6 +259,23 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
 
             </div>
           </div>
+        </div>
+
+        {/* Modal Sticky Bottom Control Bar for Easy Exit */}
+        <div className="flex flex-wrap items-center justify-between px-5 py-3 bg-[#121420] border-t border-stone-800 text-stone-200 shrink-0 print:hidden gap-3">
+          <div className="text-xs text-stone-400 flex items-center gap-2">
+            <span>برای خروج می‌توانید کلید</span>
+            <kbd className="px-2 py-0.5 bg-stone-800 border border-stone-700 rounded text-[10px] font-mono text-amber-300">Esc</kbd>
+            <span>یا فضای بیرون برگه را بفشارید.</span>
+          </div>
+
+          <button
+            onClick={handleCloseClick}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 hover:from-amber-500 hover:to-amber-600 text-stone-950 font-black text-xs md:text-sm transition-all cursor-pointer shadow-lg shadow-amber-950/50 border border-amber-400/40"
+          >
+            <ArrowRight className="w-4 h-4" />
+            <span>بستن برگه کیفرخواست و بازگشت به دادگاه</span>
+          </button>
         </div>
       </div>
     </div>

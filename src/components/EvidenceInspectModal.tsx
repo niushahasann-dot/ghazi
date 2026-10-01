@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Search, ShieldAlert, FileText, FlaskConical, Cpu, ArrowLeft } from 'lucide-react';
 import { EvidenceItem } from '../types.ts';
 import { soundManager } from '../utils/audio.ts';
@@ -14,6 +14,18 @@ export const EvidenceInspectModal: React.FC<EvidenceInspectModalProps> = ({
   onClose,
   onPresentInCourt,
 }) => {
+  useEffect(() => {
+    if (!evidence) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        soundManager.playPaperRustle();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [evidence, onClose]);
+
   if (!evidence) return null;
 
   const getTypeIcon = (type: EvidenceItem['type']) => {
@@ -42,9 +54,20 @@ export const EvidenceInspectModal: React.FC<EvidenceInspectModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    soundManager.playPaperRustle();
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-[#13151f] border border-amber-900/40 rounded-2xl shadow-2xl overflow-hidden text-stone-200">
+    <div
+      onClick={handleClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-200 cursor-pointer select-none"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-2xl bg-[#13151f] border border-amber-900/40 rounded-2xl shadow-2xl overflow-hidden text-stone-200 cursor-default select-text"
+      >
         {/* Top Header Bar */}
         <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#1c1f2e] to-[#161824] border-b border-stone-800">
           <div className="flex items-center gap-3">
@@ -57,11 +80,9 @@ export const EvidenceInspectModal: React.FC<EvidenceInspectModalProps> = ({
             </div>
           </div>
           <button
-            onClick={() => {
-              soundManager.playPaperRustle();
-              onClose();
-            }}
+            onClick={handleClose}
             className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 transition-colors cursor-pointer"
+            title="بستن (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
@@ -129,8 +150,8 @@ export const EvidenceInspectModal: React.FC<EvidenceInspectModalProps> = ({
         {/* Footer Actions */}
         <div className="px-6 py-4 bg-[#11131c] border-t border-stone-800 flex items-center justify-between gap-3">
           <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 text-sm transition-colors cursor-pointer"
+            onClick={handleClose}
+            className="px-4 py-2 rounded-xl text-stone-300 hover:text-white bg-stone-800 hover:bg-stone-700 text-sm font-semibold transition-colors cursor-pointer border border-stone-700"
           >
             بستن پرونده مدرک
           </button>
