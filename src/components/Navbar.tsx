@@ -3,8 +3,8 @@ import { Gavel, Volume2, VolumeX, FolderOpen, Scale, FileSignature, Sparkles, Ho
 import { soundManager } from '../utils/audio.ts';
 
 interface NavbarProps {
-  currentTab: 'dossier' | 'court' | 'verdict' | 'consult';
-  setCurrentTab: (tab: 'dossier' | 'court' | 'verdict' | 'consult') => void;
+  currentTab: 'dossier' | 'court' | 'verdict';
+  setCurrentTab: (tab: 'dossier' | 'court' | 'verdict') => void;
   caseTitle: string;
   caseNumber: string;
   isSoundOn: boolean;
@@ -121,22 +121,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <FileSignature className="w-4 h-4 text-red-400" />
             <span>صدور رأی نهایی</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setCurrentTab('consult');
-              soundManager.playPaperRustle();
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs md:text-sm font-medium transition-all cursor-pointer ${
-              currentTab === 'consult'
-                ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30 shadow-sm'
-                : 'text-stone-400 hover:text-stone-200 hover:bg-stone-800/40'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">➕ ساخت پرونده جدید با جمینای</span>
-            <span className="sm:hidden">جدید</span>
           </button>
         </nav>
 

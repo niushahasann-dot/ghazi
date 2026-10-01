@@ -365,13 +365,6 @@ export const CourtroomView: React.FC<CourtroomViewProps> = ({
 
                       <p className="whitespace-pre-line">{msg.text}</p>
 
-                      {/* Inner Body language observation */}
-                      {msg.innerThought && (
-                        <div className="mt-2.5 pt-2 border-t border-stone-700/60 text-[11px] text-amber-300/80 italic font-sans">
-                          {msg.innerThought}
-                        </div>
-                      )}
-
                       {/* Slip-up reveal */}
                       {msg.slipUp && (
                         <div className="mt-2 p-2.5 rounded-xl bg-red-950/50 border border-red-500/50 text-red-300 text-xs font-semibold flex items-center gap-2 shadow-inner">

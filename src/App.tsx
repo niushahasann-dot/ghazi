@@ -13,7 +13,7 @@ import { Home, ArrowRight, Sparkles } from 'lucide-react';
 export default function App() {
   // App views: 'menu' (lobby) | 'consult' (dedicated standalone design room) | 'game' (active courtroom session)
   const [currentView, setCurrentView] = useState<'menu' | 'consult' | 'game'>('menu');
-  const [currentTab, setCurrentTab] = useState<'dossier' | 'court' | 'verdict' | 'consult'>('court');
+  const [currentTab, setCurrentTab] = useState<'dossier' | 'court' | 'verdict'>('court');
 
   // Case loaded
   const [caseData, setCaseData] = useState<CaseDossier | null>(null);
@@ -507,14 +507,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            )}
-
-            {currentTab === 'consult' && (
-              <ConsultationRoom
-                onCaseGenerated={handleCaseCreatedAndEnterCourt}
-                presetCases={presetCases}
-                onSelectPresetCase={handleCaseCreatedAndEnterCourt}
-              />
             )}
           </main>
 
