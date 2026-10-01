@@ -210,7 +210,7 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
                     </p>
                   </div>
 
-                  <div className="p-4 bg-amber-50/80 border-2 border-amber-800/40 rounded-lg space-y-2">
+                    <div className="p-4 bg-amber-50/80 border-2 border-amber-800/40 rounded-lg space-y-2">
                     <div className="flex items-center gap-2 font-bold text-amber-950 text-sm">
                       <Scale className="w-4 h-4 text-amber-800" />
                       <span>
@@ -219,9 +219,16 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
                     </div>
 
                     {verdictType === 'guilty' && (
-                      <p className="text-red-950 font-extrabold text-xs">
-                        مجازات تعیینی: {penalty || 'قصاص نفس با رعایت تشریفات قانونی'}
-                      </p>
+                      <div className="space-y-1 text-xs">
+                        {verdictResult?.chargeName && (
+                          <p className="text-amber-950 font-bold">
+                            عنوان اتهام انتسابی: <strong>{verdictResult.chargeName}</strong>
+                          </p>
+                        )}
+                        <p className="text-red-950 font-extrabold">
+                          مجازات تعیینی دادگاه: {penalty || 'قصاص نفس با رعایت تشریفات قانونی'}
+                        </p>
+                      </div>
                     )}
 
                     <div className="pt-2 border-t border-amber-200">
@@ -237,6 +244,15 @@ export const OfficialJudicialSheet: React.FC<OfficialJudicialSheetProps> = ({
                       <p className="mt-1 font-mono text-[11px] text-stone-600">
                         نمره کشف حقیقت قضایی: {verdictResult.justiceRating} از ۱۰۰
                       </p>
+                    </div>
+                  )}
+
+                  {verdictResult?.historicalComparison && (
+                    <div className="p-3 bg-amber-100/60 border border-amber-400/80 rounded text-xs text-amber-950 space-y-1">
+                      <strong className="block font-bold text-amber-900">سند تطابق با دادگاه واقعی در تاریخ ({verdictResult.historicalComparison.divergencePercentage}٪ تطابق):</strong>
+                      <p><strong>رأی واقعی تاریخ:</strong> {verdictResult.historicalComparison.actualCourtVerdict}</p>
+                      <p><strong>مجازات تاریخی:</strong> {verdictResult.historicalComparison.actualSentence}</p>
+                      <p className="text-[11px] text-stone-700 italic">{verdictResult.historicalComparison.matchSummary}</p>
                     </div>
                   )}
 

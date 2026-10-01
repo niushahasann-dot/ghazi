@@ -1140,13 +1140,156 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
     }
   });
 
+  // Generate Real-World Historical Case via Gemini
+  app.post('/api/generate-real-case', async (req: Request, res: Response) => {
+    const { caseNameOrTopic, category, isRandom } = req.body;
+    let queryDesc = (caseNameOrTopic || '').trim();
+
+    if (isRandom || !queryDesc) {
+      const randomCuratedThemes = [
+        'یک پرونده واقعی و فوق‌العاده دراماتیک قتل مرموز یا جنایی در تاریخ جهان (با مدارک متناقض و معماگونه)',
+        'یکی از جنجالی‌ترین پرونده‌های جنایی یا قتل‌های دادگاه‌های تاریخ ایران (مثل خفاش شب، قتل در نیاوران یا سرقت‌های مسلحانه)',
+        'بزرگ‌ترین و عجیب‌ترین پرونده سرقت موزه، سرقت بانک یا کلاهبرداری مالی در تاریخ',
+        'پرونده واقعی ترور یا مسمومیت مشکوک با مواد سمی ناشناخته در تاریخ',
+        'معمای جنایی قتل در هالیوود یا میان افراد مشهور و ثروتمند جهان',
+        'پرونده واقعی ناپدید شدن یا قتل در اتاق بسته با شواهد مبهم بالستیک',
+      ];
+      queryDesc = randomCuratedThemes[Math.floor(Math.random() * randomCuratedThemes.length)];
+    } else if (category) {
+      queryDesc = `پرونده واقعی در موضوع: ${category} - ${queryDesc}`;
+    }
+
+    if (!ai) {
+      return res.status(503).json({ error: 'برای تولید پرونده‌های واقعی اتصال به جمینای الزامی است.' });
+    }
+
+    try {
+      const prompt = `شما مورخ ارشد جنایی و طراح پرونده‌های واقعی برای بازی دادگاه «آقای قاضی» هستید.
+کاربر درخواست ارائه یک «پرونده واقعی و تاریخی در دنیای واقعی» را دارد:
+درخواست کاربر / سوژه: "${queryDesc}"
+
+دستورالعمل‌های حیاتی:
+۱. یک پرونده کاملاً واقعی، مستند و جنجالی از تاریخ ایران یا جهان (مثلاً او.جی سیمپسون، خفاش شب، زودیاک، تد باندی، جان‌بنت رمزی، مسمومیت‌های دارویی، سرقت‌های بزرگ، قتل‌های زنجیره‌ای، پرونده‌های مشهور دادگستری ایران یا جهان) را با مشخصات واقعی بازسازی کنید.
+۲. کاربر ممکن است از قبل پرونده را نشناسد؛ بنابراین در خلاصه ماجرا (briefing)، مشخصات قربانی و مدارک به شکلی داستان‌پردازی جذاب، شفاف و کارآگاهی انجام دهید که هر فردی بدون نیاز به اطلاعات قبلی بتواند از صفر شواهد را کشف و معما را حل کند.
+۳. در متن پرونده و معرفی اشخاص، **رأی نهایی دادگاه را لو ندهید** تا بازیکن هیجان قضاوت مستقل را تجربه کند!
+۴. تمام اشخاص واقعی پرونده (متهم واقعی، کارآگاه/کارشناس رسمی، شاکی یا شهود کلیدی) را در فیلد characters بیاورید.
+۵. مدارک و شواهد واقعی کشف‌شده در صحنه جرم را با جزئیات بالستیک، ژنتیک یا اسناد مکتوب ذکر کنید.
+۶. بخش حیاتی: فیلد "realWorldInfo" را دقیقاً با حقیقت تاریخی پر کنید:
+   - "isRealCase": true
+   - "realCaseName": نام رسمی پرونده در تاریخ
+   - "historicalDate": سال و دهه وقوع
+   - "historicalLocation": شهر و کشور واقعی
+   - "actualCourtVerdict": خلاصه رأی قطعی دادگاه در واقعیت (آیا متهم واقعی تبرئه شد یا محکوم؟ دلیل هیئت منصفه چه بود؟)
+   - "actualSentence": مجازات قطعی صادره در دنیای واقعی
+   - "historicalEpilogue": سرنوشت متهم و پرونده پس از حکم در تاریخ
+   - "historicalSignificance": چرا این پرونده در تاریخ قضایی جهان یا ایران مشهور شد؟
+
+قانون مهم داینامیک سرتیترها (customHeaders):
+متناسب با موضوع پرونده (جنایی، سرقت، مسمومیت، مالی و...) سرتیترهای بخش‌های مختلف را تنظیم کنید.
+
+خروجی صرفاً یک JSON معتبر باشد با ساختار CaseDossier:
+{
+  "id": "real-${Date.now()}",
+  "caseNumber": "شماره کلاسه تاریخی پرونده",
+  "title": "عنوان جذاب و واقعی پرونده",
+  "genre": "ژانر واقعی پرونده",
+  "incidentDate": "تاریخ دقیق وقوع",
+  "location": "مکان دقیق وقوع",
+  "victimName": "نام قربانی یا مال‌باخته واقعی",
+  "victimBackground": "شرح حال قربانی",
+  "briefing": "شرح صحنه جرم و آغاز ماجرا",
+  "autopsyReport": {
+    "timeOfDeath": "زمان وقوع",
+    "causeOfDeath": "علت فوت یا شگرد اصلی",
+    "toxicology": "گزارش سم‌شناسی یا آزمایشگاهی",
+    "injuries": ["جراحات یا خسارات"],
+    "coronerNotes": "نکته کلیدی کارشناس پزشکی قانونی یا مالی"
+  },
+  "evidence": [
+    {
+      "id": "ev-1",
+      "title": "عنوان مدرک واقعی",
+      "type": "physical",
+      "description": "شرح مدرک",
+      "foundAt": "محل کشف",
+      "significance": "اهمیت مدرک در محکومیت یا تبرئه",
+      "labReport": "گزارش کارشناسی"
+    }
+  ],
+  "characters": [
+    {
+      "id": "char-1",
+      "name": "نام شخص واقعی",
+      "role": "defendant",
+      "roleTitle": "سمت واقعی در دادگاه",
+      "age": 40,
+      "occupation": "شغل",
+      "relationToVictim": "نسبت با قربانی",
+      "personality": "روحیات و رفتار",
+      "initialStatement": "دفاعیات یا سخنان واقعی در دادگاه",
+      "suspicionLevel": 85,
+      "isLying": true,
+      "deceptionStrategy": "استراتژی دفاعی در دنیای واقعی",
+      "vulnerabilities": ["تناقض‌های دفاعیات"]
+    }
+  ],
+  "hiddenTruth": {
+    "realCulpritId": "آیدی مقصر واقعی",
+    "realCulpritName": "نام مقصر واقعی",
+    "motive": "انگیزه واقعی",
+    "howCrimeHappened": "شرح واقعی چگونگی وقوع جرم در تاریخ",
+    "keyContradiction": "تناقض اساسی شواهد"
+  },
+  "customHeaders": {
+    "caseClassification": "نام دادگاه و شعبه رسیدگی‌کننده",
+    "investigationTitle": "عنوان گزارش بازپرسی",
+    "victimOrPartyLabel": "عنوان شاکی یا قربانی",
+    "briefingTitle": "عنوان شرح واقعه",
+    "expertReportTitle": "عنوان گزارش تخصصی",
+    "expertBadge": "نشان گزارش",
+    "timeLabel": "عنوان زمان واقعه",
+    "causeOrMethodLabel": "عنوان علت یا شگرد",
+    "analysisLabel": "عنوان آزمایشگاه",
+    "damagesOrInjuriesLabel": "عنوان خسارات",
+    "expertNoteLabel": "عنوان نکته کارشناس",
+    "evidenceSectionTitle": "عنوان بخش شواهد",
+    "relationLabel": "نسبت",
+    "courtBranchTitle": "نام دادگاه"
+  },
+  "allowsLiveConfession": false,
+  "realWorldInfo": {
+    "isRealCase": true,
+    "realCaseName": "نام رسمی پرونده در تاریخ",
+    "historicalDate": "تاریخ تاریخی",
+    "historicalLocation": "محل تاریخی",
+    "actualCourtVerdict": "رأی قطعی دادگاه واقعی در تاریخ",
+    "actualSentence": "مجازات واقعی",
+    "historicalEpilogue": "سرنوشت واقعی متهم پس از سال‌ها",
+    "historicalSignificance": "اهمیت پرونده در تاریخ"
+  }
+}`;
+
+      const resAi = await generateAiContent(prompt, true, 0.7, 5000);
+      const parsed = parseJsonFromAi<CaseDossier>(resAi.text);
+      res.json({
+        ...parsed,
+        _activeModel: resAi.usedModel,
+        _latencyMs: resAi.latencyMs,
+      });
+    } catch (err) {
+      console.error('Error generating real case:', err);
+      res.status(500).json({ error: 'خطا در بازسازی پرونده تاریخی توسط جمینای.' });
+    }
+  });
+
   // Verdict Evaluation API
   app.post('/api/judge-verdict', async (req: Request, res: Response) => {
-    const { caseData, accusedId, verdictType, verdictReasoning, penalty } = req.body;
+    const { caseData, accusedId, verdictType, verdictReasoning, penalty, chargeName } = req.body;
 
     const chosenPerson = (caseData?.characters || []).find((c: Character) => c.id === accusedId);
     const realCulpritId = caseData?.hiddenTruth?.realCulpritId;
     const isDirectMatch = accusedId === realCulpritId;
+    const isRealCase = Boolean(caseData?.realWorldInfo?.isRealCase);
 
     if (!ai) {
       const isCorrect = isDirectMatch && verdictType === 'guilty';
@@ -1160,11 +1303,25 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
         deceptionBusted: isCorrect,
         epilogue: 'پرونده با صدور دادنامه به اجرای احکام دادگستری ارسال شد.',
         culpritConfession: isCorrect ? 'اعتراف می‌کنم... فکر نمی‌کردم متوجه آن تناقض شوید!' : undefined,
+        chargeName: chargeName || 'اتهام انتسابی',
+        penaltyApplied: penalty || 'مجازات قانونی',
+        ...(isRealCase && caseData.realWorldInfo
+          ? {
+              historicalComparison: {
+                actualCourtVerdict: caseData.realWorldInfo.actualCourtVerdict,
+                actualSentence: caseData.realWorldInfo.actualSentence,
+                divergencePercentage: isCorrect ? 85 : 30,
+                matchSummary: isCorrect ? 'حکم شما تطابق بسیار بالایی با سیر قضایی این پرونده تاریخی داشت.' : 'تصمیم شما با رأی دادگاه تاریخی در دنیای واقعی تفاوت اساسی داشت.',
+                historicalAnalysis: `در دنیای واقعی: ${caseData.realWorldInfo.actualCourtVerdict}`,
+                realWorldEpilogue: caseData.realWorldInfo.historicalEpilogue,
+              },
+            }
+          : {}),
       });
     }
 
     try {
-      const evaluationPrompt = `شما هیئت عالی نظارت قضایی بر احکام دادگاه جنایی در بازی «آقای قاضی» هستید.
+      const evaluationPrompt = `شما هیئت عالی نظارت قضایی بر احکام دادگاه در بازی «آقای قاضی» هستید.
 پرونده: ${caseData.title}
 شرح واقعه: ${caseData.briefing}
 حقیقت پنهان واقعی:
@@ -1173,29 +1330,49 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
 نحوه وقوع: ${caseData.hiddenTruth?.howCrimeHappened || ''}
 تناقض کلیدی: ${caseData.hiddenTruth?.keyContradiction || ''}
 
+${isRealCase && caseData.realWorldInfo ? `اطلاعات پرونده واقعی در دنیای واقعی:
+نام واقعی پرونده: ${caseData.realWorldInfo.realCaseName}
+رأی قطعی دادگاه واقعی در تاریخ: ${caseData.realWorldInfo.actualCourtVerdict}
+مجازات واقعی در تاریخ: ${caseData.realWorldInfo.actualSentence}
+سرنوشت واقعی: ${caseData.realWorldInfo.historicalEpilogue}` : ''}
+
 حکم صادره توسط قاضی (بازیکن):
 شخص انتخاب شده: ${chosenPerson?.name || 'نامشخص'} (آیدی: ${accusedId})
 نوع حکم: ${verdictType} (مثلاً guilty به معنای محکوم، acquitted به معنای تبرئه)
-استدلال قاضی: ${verdictReasoning}
-میزان مجازات تعیینی: ${penalty || 'تعیین نشده'}
+عنوان اتهام انتسابی تایپ‌شده توسط قاضی: "${chargeName || 'تعیین نشده'}"
+میزان و نوع مجازات تایپ‌شده توسط قاضی: "${penalty || 'تعیین نشده'}"
+استدلال قضایی مکتوب قاضی: "${verdictReasoning}"
 
-وظیفه شما:
-۱. بررسی کنید آیا قاضی درست تشخیص داده و مجرم واقعی را محکوم کرده است؟
-۲. آیا استدلال قاضی به تناقض اصلی و مدارک معتبر اشاره کرده است؟
-۳. نمره عدالت (justiceRating بین ۰ تا ۱۰۰) بدهید.
-۴. شرح کامل حقیقت را برای کاربر فاش کنید تا بفهمد واقعاً پشت پرده چه گذشته بوده.
-۵. خروجی صرفاً یک JSON معتبر باشد با فرمت:
+وظیفه خطیر شما برای ارزیابی جامع دادنامه:
+۱. ارزیابی تشخیص مجرم: آیا قاضی درست تشخیص داده و مجرم واقعی را محکوم کرده است یا فرد بی‌گناه را؟
+۲. **ارزیابی عنوان اتهام تایپ‌شده**: بررسی کنید آیا عنوان اتهام انتسابی که قاضی تایپ کرده (مثلاً قتل، کلاهبرداری، سرقت، خیانت در امانت و...) با ماهیت واقعی این جرم تناسب حقوقی دقیق دارد یا خیر؟
+۳. **ارزیابی تناسب مجازات تایپ‌شده**: آیا مجازات تعیین‌شده متناسب با جرم و قوانین است؟
+۴. ارزیابی استدلال قضایی: آیا قاضی به مدارک محوری و تناقض اصلی استناد کرده است؟
+۵. نمره عدالت (justiceRating بین ۰ تا ۱۰۰) بدهید.
+${isRealCase ? `۶. **تحلیل مقایسه‌ای با دنیای واقعی (historicalComparison)**: حتماً بخش مقایسه تاریخی را پر کنید و بنویسید که حکم صادر شده توسط کاربر، چند درصد (divergencePercentage) با رأی قطعی دادگاه در واقعیت تاریخ تطابق یا تفاوت داشته و چرا دادگاه واقعی آن تصمیم را گرفت.` : ''}
+
+خروجی صرفاً یک JSON معتبر باشد با فرمت:
 {
   "isCorrect": true/false,
   "justiceRating": 95,
   "truthRevealed": "شرح کامل و جذاب حقیقت واقعی پشت پرده جنایت",
-  "feedback": "تحلیل عملکرد قاضی: نقاط قوت استدلال و مواردی که قاضی متوجه شد یا غفلت کرد",
+  "feedback": "تحلیل تخصصی عملکرد قاضی: ارزیابی درستی عنوان اتهام تایپ‌شده، تناسب مجازات انتخابی و شواهد مورد استناد",
   "deceptionBusted": true/false,
   "epilogue": "سرنوشت پرونده، متهم و شاکی پس از اجرای این حکم",
-  "culpritConfession": "جملات اعتراف یا واکنش نهایی مقصر در لحظه اعلام حکم"
+  "culpritConfession": "جملات اعتراف یا واکنش نهایی مقصر در لحظه اعلام حکم",
+  "chargeName": "${chargeName || ''}",
+  "penaltyApplied": "${penalty || ''}"${isRealCase ? `,
+  "historicalComparison": {
+    "actualCourtVerdict": "خلاصه رأی دادگاه تاریخی در واقعیت",
+    "actualSentence": "مجازات واقعی در تاریخ",
+    "divergencePercentage": 85,
+    "matchSummary": "خلاصه میزان تطابق یا تفاوت حکم قاضی با رأی تاریخی دادگاه در دنیای واقعی",
+    "historicalAnalysis": "تحلیل مقایسه‌ای مفصل و جذاب: تفاوت استدلال قاضی کاربر با هیئت منصفه و وکلای دادگاه تاریخی واقعی",
+    "realWorldEpilogue": "سرنوشت واقعی شخصیت‌های پرونده در تاریخ پس از دادرسی"
+  }` : ''}
 }`;
 
-      const resAi = await generateAiContent(evaluationPrompt, true, 0.7, 1000, MODEL_TIER_FAST_LITE);
+      const resAi = await generateAiContent(evaluationPrompt, true, 0.7, 1200, MODEL_TIER_FAST_LITE);
       const parsed = parseJsonFromAi<Record<string, unknown>>(resAi.text);
       res.json({
         ...parsed,
@@ -1212,6 +1389,20 @@ ${evidence ? `مدرک پیوست‌شده توسط قاضی که کل دادگ�
         feedback: isCorrect ? 'رأی منطبق بر حقیقت و مدارک موجود اصدار یافت.' : 'حکم صادره با واقعیت مادی پرونده همخوانی نداشت.',
         deceptionBusted: isCorrect,
         epilogue: 'پرونده به اجرای احکام دادسرا ارجاع شد.',
+        chargeName: chargeName || 'اتهام انتسابی',
+        penaltyApplied: penalty || 'مجازات قانونی',
+        ...(isRealCase && caseData.realWorldInfo
+          ? {
+              historicalComparison: {
+                actualCourtVerdict: caseData.realWorldInfo.actualCourtVerdict,
+                actualSentence: caseData.realWorldInfo.actualSentence,
+                divergencePercentage: isCorrect ? 80 : 35,
+                matchSummary: isCorrect ? 'حکم شما تطابق بالایی با مستندات تاریخی داشت.' : 'حکم شما با رأی دادگاه واقعی در تاریخ متفاوت بود.',
+                historicalAnalysis: `در دادگاه واقعی: ${caseData.realWorldInfo.actualCourtVerdict}`,
+                realWorldEpilogue: caseData.realWorldInfo.historicalEpilogue,
+              },
+            }
+          : {}),
       });
     }
   });

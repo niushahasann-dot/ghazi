@@ -339,7 +339,8 @@ export default function App() {
     accusedId: string,
     verdictType: string,
     reasoning: string,
-    penalty: string
+    penalty: string,
+    chargeName?: string
   ): Promise<VerdictResult | null> => {
     if (!caseData) return null;
     try {
@@ -352,6 +353,7 @@ export default function App() {
           verdictType,
           verdictReasoning: reasoning,
           penalty,
+          chargeName,
         }),
       });
 

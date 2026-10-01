@@ -64,6 +64,26 @@ export interface CaseHeaders {
   courtBranchTitle?: string;
 }
 
+export interface RealWorldHistoricalInfo {
+  isRealCase: boolean;
+  realCaseName: string; // e.g. "پرونده محاکمه قرن: او.جی. سیمپسون"
+  historicalDate: string; // e.g. "۱۹۹۴ - ۱۹۹۵ میلادی"
+  historicalLocation: string; // e.g. "لس‌آنجلس، ایالات متحده آمریکا"
+  actualCourtVerdict: string; // The actual verdict of the real court
+  actualSentence: string; // The real punishment / outcome
+  historicalEpilogue: string; // What happened in reality afterwards
+  historicalSignificance?: string;
+}
+
+export interface HistoricalComparison {
+  actualCourtVerdict: string;
+  actualSentence: string;
+  divergencePercentage: number; // 0 to 100
+  matchSummary: string;
+  historicalAnalysis: string;
+  realWorldEpilogue: string;
+}
+
 export interface CaseDossier {
   id: string;
   caseNumber: string; // e.g. "۱۴۰۵/۸۲۹-ج"
@@ -80,6 +100,7 @@ export interface CaseDossier {
   hiddenTruth: HiddenTruth;
   customHeaders?: CaseHeaders;
   allowsLiveConfession?: boolean;
+  realWorldInfo?: RealWorldHistoricalInfo;
 }
 
 export interface InterrogationMessage {
@@ -104,6 +125,9 @@ export interface VerdictResult {
   deceptionBusted: boolean;
   epilogue: string;
   culpritConfession?: string;
+  chargeName?: string;
+  penaltyApplied?: string;
+  historicalComparison?: HistoricalComparison;
 }
 
 export interface ConsultationMessage {
